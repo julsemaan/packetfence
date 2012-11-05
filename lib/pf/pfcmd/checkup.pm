@@ -264,9 +264,9 @@ Validation related to the Snort/Suricata IDS usage
 sub ids {
 
     # make sure a monitor device is present if trapping.detection is enabled
-    if ( !$monitor_int ) {
-        add_problem( $FATAL,
-            "monitor interface not defined, please disable trapping.detection " .
+    if ( !$monitor_int && $Config{'trapping'}{'detection_engine'} ne 'tipping_point' ) {
+        add_problem( $FATAL, 
+            "monitor interface not defined, please disable trapping.detection " . 
             "or set an interface type=...,monitor in pf.conf"
         );
     }
@@ -280,9 +280,9 @@ sub ids {
     }
 
     # make sure trapping.detection_engine=snort|suricata
-    if ( $Config{'trapping'}{'detection_engine'} ne 'snort' && $Config{'trapping'}{'detection_engine'} ne 'suricata' ) {
+    if ( $Config{'trapping'}{'detection_engine'} ne 'snort' && $Config{'trapping'}{'detection_engine'} ne 'suricata' && $Config{'trapping'}{'detection_engine'} ne 'tipping_point' ) {
         add_problem( $FATAL,
-            "Detection Engine (trapping.detection_engine) needs to be either snort or suricata."
+            "Detection Engine (trapping.detection_engine) needs to be either snort or suricata or tipping_point."
         );
     }
 
