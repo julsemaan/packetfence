@@ -208,7 +208,7 @@ Requires: perl(MooseX::Types::LoadableClass)
 Requires: perl(IO::Interface::Simple)
 Requires: vconfig
 # for windows profil
-Requires: perl(Cache::Memcached), perl(Apache::Session::Memcached), perl(Apache::Session), memcached
+Requires: perl(Cache::Memcached), perl(Apache::Session::Memcached), perl(Apache::Session), memcached, perl(Crypt::OpenSSL::X509)
 #
 # TESTING related
 #
@@ -760,6 +760,7 @@ fi
                         /usr/local/pf/html/captive-portal/content/timerbar.js
 %dir                    /usr/local/pf/html/captive-portal/content/images
                         /usr/local/pf/html/captive-portal/content/images/*
+                        /usr/local/pf/html/captive-portal/content/WPA_Ent_Config.exe
 %dir                    /usr/local/pf/html/captive-portal/templates
 %config(noreplace)      /usr/local/pf/html/captive-portal/templates/*
 %dir                    /usr/local/pf/html/captive-portal/violations
