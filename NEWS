@@ -16,6 +16,13 @@ For a list of compatibility related changes see the UPGRADE file.
 Version <develVersion> released on <develVersionReleaseDate>
 
 --------------------------------------------------------------------------------
+Version <releaseVersion> released on <releaseDate>
+
+Bug Fixes
+ * Modified the SQL upgrade script from 3.5.0 to 3.6.1 (#1624)
+>>>>>>> Fixing #1624
+
+--------------------------------------------------------------------------------
 Version 3.6.1 released on 2013-01-10
 
 New Features
