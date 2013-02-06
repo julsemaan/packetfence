@@ -50,6 +50,8 @@ Bug Fixes
 
 New Features
  * Proxy interception for the captive portal
+ * Advance unregdate calculation
+
 --------------------------------------------------------------------------------
 Version 3.6.0 released on 2012-10-25
 
