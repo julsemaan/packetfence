@@ -1,7 +1,7 @@
-package pfappserver::Model::Config::Cached::Profile;
+package pfappserver::Model::Config::Cached::FloatingDevice;
 =head1 NAME
 
-pfappserver::Model::Config::Cached::Profile add documentation
+pfappserver::Model::Config::Cached::FloatingDevice add documentation
 
 =cut
 
@@ -29,22 +29,38 @@ extends 'pfappserver::Base::Model::Config::Cached';
 
 sub _buildCachedConfig {
     my ($self) = @_;
-    return pf::config::cached->new(-file => $pf::config::profiles_config_file);
+    return pf::config::cached->new(-file => $pf::config::floating_devices_config_file);
 }
 
-=item remove
+#=item remove
+#
+#Delete an existing item
+#
+#=cut
+#
+#sub remove {
+#    my ($self,$id) = @_;
+#    if($id eq 'default') {
+#        return ($STATUS::INTERNAL_SERVER_ERROR, "Cannot delete this item");
+#    }
+#    return $self->SUPER::remove($id);
+#}
 
-Delete an existing item
-
-=cut
-
-sub remove {
-    my ($self,$id) = @_;
-    if($id eq 'default') {
-        return ($STATUS::INTERNAL_SERVER_ERROR, "Cannot delete this item");
-    }
-    return $self->SUPER::remove($id);
-}
+#=item cleanupAfterRead
+#
+#=cut
+#
+#sub cleanupAfterRead {
+#    my ( $self,$id, $switch ) = @_;
+#}
+#
+#=item cleanupBeforeCommit
+#
+#=cut
+#
+#sub cleanupBeforeCommit {
+#    my ( $self, $id, $switch ) = @_;
+#}
 
 __PACKAGE__->meta->make_immutable;
 

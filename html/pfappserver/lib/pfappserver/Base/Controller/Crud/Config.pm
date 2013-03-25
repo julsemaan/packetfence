@@ -1,58 +1,50 @@
-package pfappserver::Model::Config::Cached::Profile;
+package pfappserver::Base::Controller::Crud::Config;
 =head1 NAME
 
-pfappserver::Model::Config::Cached::Profile add documentation
+pfappserver::Base::Controller::Crud::Config add documentation
 
 =cut
 
 =head1 DESCRIPTION
 
-pfappserver::Model::Config::Cached::Profile
+PortalProfile
 
 =cut
 
-use Moose;
+use strict;
+use warnings;
+use HTTP::Status qw(:constants is_error is_success);
+use MooseX::MethodAttributes::Role;
 use namespace::autoclean;
-use pf::config::cached;
-use pf::config;
 
-extends 'pfappserver::Base::Model::Config::Cached';
-
+with 'pfappserver::Base::Controller::Crud';
 
 =head2 Methods
 
 =over
 
-=item _buildCachedConfig
-
 =cut
 
-sub _buildCachedConfig {
-    my ($self) = @_;
-    return pf::config::cached->new(-file => $pf::config::profiles_config_file);
-}
-
-=item remove
-
-Delete an existing item
-
-=cut
-
-sub remove {
-    my ($self,$id) = @_;
-    if($id eq 'default') {
-        return ($STATUS::INTERNAL_SERVER_ERROR, "Cannot delete this item");
+after [qw(update remove)] => sub {
+    my ($self,$c) = @_;
+    if(is_success($c->response->status) ) {
+        $self->getModel($c)->rewriteConfig();
     }
-    return $self->SUPER::remove($id);
-}
+};
 
-__PACKAGE__->meta->make_immutable;
+after create => sub {
+    my ($self,$c) = @_;
+    if(is_success($c->response->status) && $c->request->method eq 'POST' ) {
+        $self->getModel($c)->rewriteConfig();
+    }
+};
+
 
 =back
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2012-2013 Inverse inc.
 
 =head1 LICENSE
 
