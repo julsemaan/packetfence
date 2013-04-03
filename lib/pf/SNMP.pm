@@ -40,6 +40,19 @@ use pf::util::radius qw(perform_disconnect);
 
 =cut
 
+=item resetPortSecurity
+
+#CUSTOM code made to reset the mac addresses on all port-security enabled ports (used at power-on)
+This is empty because the code is made only for the Cisco::Catalyst_2960
+
+=cut
+sub resetPortSecurity {
+    my ( $this ) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($this) );
+    $logger->error("Port Security reset is not supported on switch type " . ref($this));
+    return $FALSE
+}
+
 =item supportsFloatingDevice
 
 Returns 1 if switch type supports floating network devices

@@ -133,8 +133,15 @@ sub parseTrap {
     my $trapHashRef;
     my $logger = Log::Log4perl::get_logger( ref($this) );
 
-    #link up/down
+    #CUSTOM : power-on
     if ( $trapString
+        =~ /\.1\.3\.6\.1\.4\.1\.9\.2\.1\.2\.0 = STRING: "power-on" END VARIABLEBINDINGS/
+       )
+    {
+        $trapHashRef->{'trapType'} = "power-on";
+        $trapHashRef->{'trapIfIndex'} = "n/a";
+    }#link up/down
+     elsif ( $trapString
         =~ /BEGIN VARIABLEBINDINGS [^|]+[|]\.1\.3\.6\.1\.6\.3\.1\.1\.4\.1\.0 = OID: \.1\.3\.6\.1\.6\.3\.1\.1\.5\.([34])\|.1.3.6.1.2.1.2.2.1.1.([0-9]+)/
         )
     {

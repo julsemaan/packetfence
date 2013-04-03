@@ -1704,6 +1704,11 @@ sub handleTrap {
 
         # }}}2
     } 
+    #CUSTOM
+    elsif ( $trapType eq 'power-on'){
+        $logger->info("Power-on detected on $switch_ip . Resetting all port-security enabled ports.");
+        $switch->resetPortSecurity();
+    } 
 
     # cleanupAfterThread {{{2
     cleanupAfterThread( $switch_ip, $switch_port );

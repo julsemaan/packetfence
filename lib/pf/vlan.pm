@@ -111,8 +111,9 @@ sub doWeActOnThisTrap {
     my $logger = Log::Log4perl->get_logger();
 
     # TODO we should rethink the position of this code, it's in the wrong test but at the good spot in the flow
+    #CUSTOM (power-on)
     my $weActOnThisTrap = 0;
-    if ( $trapType eq 'desAssociate' || $trapType eq 'firewallRequest' ) {
+    if ( $trapType eq 'desAssociate' || $trapType eq 'firewallRequest'  || $trapType eq 'power-on') {
         return 1;
     }
     if ( $trapType eq 'dot11Deauthentication' ) {
