@@ -184,6 +184,7 @@ sub disablePortConfig {
         }
     }
 
+    $switch->setAdminStatus( $switch_port, $SNMP::DOWN );
     $logger->info("Setting port $switch_port to MAC detection Vlan.");
     if (! $switch->setMacDetectionVlan( $switch_port, $switch_locker_ref )) {
         $logger->warn("An minor issue occured while setting port $switch_port to MAC detection Vlan " .
@@ -193,9 +194,11 @@ sub disablePortConfig {
     $logger->info("Enabling port-security on port $switch_port");
     if (! $switch->enablePortSecurityByIfIndex($switch_port)) {
         $logger->error("An error occured while enabling port-security on port $switch_port");
+        $switch->setAdminStatus( $switch_port, $SNMP::UP );
         return 0;
     }
 
+    $switch->setAdminStatus( $switch_port, $SNMP::UP );
     return 1;
 }
 
