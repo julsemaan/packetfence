@@ -342,6 +342,7 @@ sub getNormalVlan {
     }
     elsif (defined $node_info->{'pid'}){
         $logger->info("Looking up roles based on the node pid");
+        if(!defined $ssid){$ssid=""}
         my $params = {
             username => $node_info->{'pid'},
             connection_type => connection_type_to_str($connection_type),
