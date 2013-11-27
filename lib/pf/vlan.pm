@@ -340,6 +340,15 @@ sub getNormalVlan {
         };
         $role = &pf::authentication::match(&pf::authentication::getInternalAuthenticationSources(), $params, $Actions::SET_ROLE);
     }
+    elsif (defined $node_info->{'pid'}){
+        $logger->info("Looking up roles based on the node pid");
+        my $params = {
+            username => $node_info->{'pid'},
+            connection_type => connection_type_to_str($connection_type),
+            SSID => $ssid,
+        };
+        $role = &pf::authentication::match(&pf::authentication::getInternalAuthenticationSources(), $params, $Actions::SET_ROLE);
+    }
 
     # If a user based role has been found by matching authentication sources rules, we return it
     if ( defined($role) && $role ne '' ) {
