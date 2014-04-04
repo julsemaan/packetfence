@@ -33,6 +33,8 @@ use pf::authentication;
 use pf::Authentication::constants;
 use List::MoreUtils qw(any);
 
+use pf::mdm
+
 Log::Log4perl->init("$conf_dir/log.conf");
 my $logger = Log::Log4perl->get_logger('register.cgi');
 Log::Log4perl::MDC->put('proc', 'register.cgi');
@@ -167,6 +169,19 @@ elsif ( (defined($cgi->param('username') ) || $no_username_needed ) && ($cgi->pa
   }
   if (defined $value) {
       %info = (%info, (unregdate => $value));
+  }
+
+  my $authorizer_name = $portalSession->getProfile()->getAuthorizer();
+  
+  if(defined($authorizer_name)){
+      my $authorizer = pf::mdm->new($authorizer_name);
+      $logger->info("There is an authorizer : $authorizer_name");
+      unless($authorizer->authorize($mac) == 1){
+          %info = (%info, (status=>$pf::node::STATUS_PENDING));
+          node_modify($portalSession->getClientMac(), %info);
+          pf::web::generate_authorizer_page($portalSession, %info);
+          exit(0);
+      }
   }
 
   pf::web::web_node_register($portalSession, $pid, %info);
