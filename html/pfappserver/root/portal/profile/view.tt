@@ -37,7 +37,7 @@
           <a href="[% c.pf_hash_for(c.controller('Portal::Profile').action_for('files'),[id]) %]" >[% l('Files')  %]</a>
         </li>
       </ul>
-      <div class="tab-pane fade in [% tab == 'settings'  %]active[% END %]" id="settings">
+      <div class="tab-pane fade in [% IF tab == 'settings'  %]active[% END %]" id="settings">
           [% form.block('definition').render %]
           [% IF form.field('filter') %]
           <div class="control-group">
