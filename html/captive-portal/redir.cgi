@@ -33,6 +33,8 @@ use pf::web::billing 1.00;
 use pf::web::custom;
 use pf::sms_activation;
 
+use pf::mdm
+
 Log::Log4perl->init("$conf_dir/log.conf");
 my $logger = Log::Log4perl->get_logger('redir.cgi');
 Log::Log4perl::MDC->put('proc', 'redir.cgi');
@@ -135,7 +137,21 @@ if ($unreg && isenabled($Config{'trapping'}{'registration'})){
 #if node is pending show pending page
 my $node_info = node_view($mac);
 if (defined($node_info) && $node_info->{'status'} eq $pf::node::STATUS_PENDING) {
-  if (pf::sms_activation::sms_activation_has_entry($mac)) {
+ if (defined( $portalSession->getProfile()->getAuthorizer()) &&  $node_info->{'status'} eq $pf::node::STATUS_PENDING){
+    my $authorizer = pf::mdm->new($portalSession->getProfile()->getAuthorizer());
+
+    unless($authorizer->authorize($portalSession->getClientMac()) == 1){ 
+      pf::web::generate_authorizer_page($portalSession, $node_info);
+      exit(0);
+    }
+    else{
+      unless( pf::sms_activation::sms_activation_has_entry($mac) ){
+        pf::web::end_authorizer_isolation($portalSession, $mac);
+        exit(0); 
+      }
+    }
+  }
+ if (pf::sms_activation::sms_activation_has_entry($mac)) {
     pf::web::guest::generate_sms_confirmation_page($portalSession, "/activate/sms");
   }
   elsif ($portalSession->getCgi->https()) {

@@ -122,7 +122,14 @@ elsif (defined($cgi->url_param('mode')) && $cgi->url_param('mode') eq "aup") {
 elsif (defined($cgi->url_param('mode'))) {
   pf::web::generate_error_page($portalSession, i18n("error: incorrect mode"));
 }
+elsif (defined( $portalSession->getProfile()->getAuthorizer()) &&  node_view($portalSession->getClientMac())->{'status'} eq $pf::node::STATUS_PENDING){
+  my $authorizer = pf::mdm->new($portalSession->getProfile()->getAuthorizer());
 
+  unless($authorizer->authorize($portalSession->getClientMac()) == 1){ 
+      pf::web::generate_authorizer_page($portalSession, %info);
+      exit(0);
+  }
+}
 elsif ( (defined($cgi->param('username') ) || $no_username_needed ) && ($cgi->param('username') ne '' || $no_password_needed )) {
   my ($form_return, $err) = pf::web::validate_form($portalSession);
   if ($form_return != 1) {
@@ -172,7 +179,6 @@ elsif ( (defined($cgi->param('username') ) || $no_username_needed ) && ($cgi->pa
   }
 
   my $authorizer_name = $portalSession->getProfile()->getAuthorizer();
-  
   if(defined($authorizer_name)){
       my $authorizer = pf::mdm->new($authorizer_name);
       $logger->info("There is an authorizer : $authorizer_name");
