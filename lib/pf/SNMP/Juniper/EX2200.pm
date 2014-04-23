@@ -18,6 +18,10 @@ sub description { 'Juniper EX 2200 Series' }
 
 # importing switch constants
 use pf::SNMP::constants;
+use pf::accounting qw(node_accounting_current_sessionid);
+use pf::node qw(node_attributes);
+use pf::util::radius qw(perform_coa perform_disconnect);
+use Try::Tiny;
 
 sub supportsRadiusVoip { return $TRUE; }
 # special features
@@ -177,6 +181,102 @@ sub ifIndexToLldpLocalPort {
     return;
 }
 
+=item deauthenticateMacRadius
+
+Method to deauth a wired node with RADIUS Disconnect.
+
+=cut
+sub deauthenticateMacRadius {
+    my ($this, $ifIndex,$mac) = @_;
+    my $logger = Log::Log4perl::get_logger(ref($this));
+
+    $this->radiusDisconnect($mac );
+}
+
+=item radiusDisconnect
+
+Send a Disconnect request to disconnect a mac
+
+=cut
+sub radiusDisconnect {
+    my ($self, $mac, $add_attributes_ref) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+
+    # initialize
+    $add_attributes_ref = {} if (!defined($add_attributes_ref));
+
+    if (!defined($self->{'_radiusSecret'})) {
+        $logger->warn(
+            "Unable to perform RADIUS Disconnect-Request on $self->{'_ip'}: RADIUS Shared Secret not configured"
+        );
+        return;
+    }
+
+    $logger->info("deauthenticating $mac");
+
+    # Where should we send the RADIUS CoA-Request?
+    # to network device by default
+    my $send_disconnect_to = $self->{'_ip'};
+    my $response;
+    try {
+        my $connection_info = {
+            nas_ip => $send_disconnect_to,
+            secret => $self->{'_radiusSecret'},
+            LocalAddr => $management_network->tag('vip'),
+        };
+       
+        my $acctsessionid = node_accounting_current_sessionid($mac);
+        # Standard Attributes
+        my $attributes_ref = {
+            'Calling-Station-Id' => $mac,
+            'Acct-Session-Id' => $acctsessionid,
+            'NAS-IP-Address' => $send_disconnect_to,
+
+        };
+
+        # merging additional attributes provided by caller to the standard attributes
+        $attributes_ref = { %$attributes_ref, %$add_attributes_ref };
+
+        $response = perform_disconnect($connection_info, $attributes_ref, []);
+
+    } catch {
+        chomp;
+        $logger->warn("Unable to perform RADIUS Disconnect-Request: $_");
+        $logger->error("Wrong RADIUS secret or unreachable network device...") if ($_ =~ /^Timeout/);
+    };
+    return if (!defined($response));
+
+    return $TRUE if ($response->{'Code'} eq 'Disconnect-ACK');
+
+    $logger->warn(
+        "Unable to perform RADIUS Disconnect-Request."
+        . ( defined($response->{'Code'}) ? " $response->{'Code'}" : 'no RADIUS code' ) . ' received'
+        . ( defined($response->{'Error-Cause'}) ? " with Error-Cause: $response->{'Error-Cause'}." : '' )
+    );
+    return;
+}
+
+sub wiredeauthTechniques { 
+   my ($this, $method, $connection_type) = @_;
+   my $logger = Log::Log4perl::get_logger( ref($this) );
+
+
+    if ($connection_type == $WIRED_MAC_AUTH) {
+        my $default = $SNMP::RADIUS;
+        my %tech = (
+            $SNMP::RADIUS => \&deauthenticateMacRadius,
+        );
+
+        if (!defined($method) || !defined($tech{$method})) {
+            $method = $default;
+        }
+        return $method,$tech{$method};
+    }
+    else{
+        $logger->error("Only RADIUS deauth is not supported on EX2200");
+    }
+
+}
 
 =head1 AUTHOR
 
