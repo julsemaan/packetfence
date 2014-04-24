@@ -28,6 +28,12 @@ sub supportsRadiusVoip { return $TRUE; }
 sub supportsLldp { return $TRUE; }
 sub isVoIPEnabled {return $TRUE; }
 
+=item getVoipVsa
+
+Get Voice over IP RADIUS Vendor Specific Attribute (VSA).
+For now it returns the voiceVlan untagged since Juniper supports multiple untagged VLAN in the same interface
+
+=cut
 sub getVoipVsa{
     my ($this) = @_; 
     my $logger = Log::Log4perl::get_logger( ref($this) ); 
@@ -43,6 +49,11 @@ sub getVoipVsa{
  
 }
 
+=item getIfIndexByNasPortId
+
+Return the SNMP ifindex based on the Nas-Port-Id RADIUS attribute
+
+=cut
 sub getIfIndexByNasPortId{
     my ($this, $nas_port_id) = @_;
     my $logger = Log::Log4perl::get_logger( ref($this) );
@@ -72,9 +83,6 @@ sub getIfIndexByNasPortId{
 
 Return list of MACs found through LLDP on a given ifIndex.
 
-If this proves to be generic enough, it could be promoted to L<pf::SNMP>.
-In that case, create a generic ifIndexToLldpLocalPort also.
-
 =cut
 
 sub getPhonesLLDPAtIfIndex {
@@ -85,8 +93,8 @@ sub getPhonesLLDPAtIfIndex {
     return if ( !$this->connectRead() );
     
     # LLDP info takes a few seconds to appear in the SNMP table after the switch makes the radius request
-    # Sleep for 10 seconds to make sure the info is there
-    sleep(10);
+    # Sleep for 2 seconds to make sure the info is there
+    sleep(2);
 
     # SNMP index for LLDP info is 1 more than the usual SNMP index
     # Ex : 520 becomes 521
@@ -105,20 +113,17 @@ sub getPhonesLLDPAtIfIndex {
     # Cap entries look like this:
     # iso.0.8802.1.1.2.1.4.1.1.12.0.10.29 = Hex-STRING: 24 00
     # We want to validate that the telephone capability bit is turned on.
-    my @phones = ();
-    $logger->info("This is result ".$result);
-    $logger->info("lldpPort ".$lldpPort);
+    my @phones = (); 
     foreach my $oid ( keys %{$result} ) {
-        $logger->info("Checkin out $oid");
+
         # grab the lldpRemIndex
         if ( $oid =~ /^$oid_lldpRemSysCapEnabled\.([0-9]+)\.$lldpPort\.([0-9]+)$/ ) {
 
             my $lldpRemTimeMark = $1;
             my $lldpRemIndex = $2;
-            $logger->info("Is telephone bit ".$this->getBitAtPosition($result->{$oid}, $SNMP::LLDP::TELEPHONE));
-            $logger->info("lldpRemIndex ".$lldpRemIndex);
             # make sure that what is connected is a VoIP phone based on lldpRemSysCapEnabled information
             if ( $this->getBitAtPosition($result->{$oid}, $SNMP::LLDP::TELEPHONE) ) {
+                $logger->debug("Found phone on lldp port : ".$lldpPort);
                 # we have a phone on the port. Get the MAC
                 $logger->trace(
                     "SNMP get_request for lldpRemPortId: "
@@ -130,7 +135,7 @@ sub getPhonesLLDPAtIfIndex {
                     ]
                 );
                 next if (!defined($portIdResult));
-                $logger->info("portIdResult". $portIdResult->{"$oid_lldpRemPortId.$lldpRemTimeMark.$lldpPort.$lldpRemIndex"});
+
                 if ($portIdResult->{"$oid_lldpRemPortId.$lldpRemTimeMark.$lldpPort.$lldpRemIndex"}
                         =~ /^([0-9A-Z]{2})([0-9A-Z]{2})([0-9A-Z]{2})([0-9A-Z]{2})([0-9A-Z]{2})([0-9A-Z]{2})\:[0-9A-Z]+$/i) {
                     push @phones, lc("$1:$2:$3:$4:$5:$6");
@@ -141,45 +146,6 @@ sub getPhonesLLDPAtIfIndex {
     return @phones;
 }
 
-
-=item ifIndexToLldpLocalPort
-
-Translate an ifIndex into an LLDP Local Port number.
-
-We use ifDescr to lookup the lldpRemLocalPortNum in the lldpLocPortDesc table.
-
-=cut
-
-sub ifIndexToLldpLocalPort {
-    my ( $this, $ifIndex ) = @_;
-    my $logger = Log::Log4perl::get_logger( ref($this) );
-
-    # if can't SNMP read abort
-    return if ( !$this->connectRead() );
-
-    my $ifDescr = $this->getIfDesc($ifIndex);
-    return if (!defined($ifDescr) || $ifDescr eq '');
-
-    my $oid_lldpLocPortDesc = '1.0.8802.1.1.2.1.3.7.1.4'; # from LLDP-MIB
-
-    $logger->trace("SNMP get_table for lldpLocPortDesc: $oid_lldpLocPortDesc");
-    my $result = $this->{_sessionRead}->get_table( -baseoid => $oid_lldpLocPortDesc);
-    # here's what we are getting here. Looking for the last element of the OID: lldpRemLocalPortNum
-    # iso.0.8802.1.1.2.1.3.7.1.4.10 = STRING: "FastEthernet1/0/8"
-    # iso.0.8802.1.1.2.1.3.7.1.4.11 = STRING: "FastEthernet1/0/9"
-    # iso.0.8802.1.1.2.1.3.7.1.4.12 = STRING: "FastEthernet1/0/10"
-    # iso.0.8802.1.1.2.1.3.7.1.4.13 = STRING: "FastEthernet1/0/11"
-    foreach my $entry ( keys %{$result} ) {
-        if ( $result->{$entry} eq $ifDescr ) {
-            if ( $entry =~ /^$oid_lldpLocPortDesc\.([0-9]+)$/ ) {
-                return $1;
-            }
-        }
-    }
-
-    # nothing found
-    return;
-}
 
 =item deauthenticateMacRadius
 
@@ -255,6 +221,12 @@ sub radiusDisconnect {
     );
     return;
 }
+
+=item wiredeauthTechniques
+
+Return the reference to the deauth technique or the default deauth technique.
+
+=cut
 
 sub wiredeauthTechniques { 
    my ($this, $method, $connection_type) = @_;
