@@ -293,6 +293,17 @@ sub nbregpages {
     return $self->{'_nbregpages'};
 }
 
+=item provisioners 
+
+The provisioners
+
+=cut
+
+sub provisioners {
+    my ($self) = @_;
+    return $self->{'_provisioners'};
+}
+
 =back
 
 =head1 AUTHOR
