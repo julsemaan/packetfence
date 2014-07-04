@@ -229,6 +229,16 @@ sub firewall {
     $inline->performInlineEnforcement($postdata{'mac'});
 }
 
+sub openflow_authorize {
+    my ($class, $postdata ) = @_;
+    my $logger = pf::log::get_logger();
+    $logger->info("Authorizing $postdata->{mac} on switch $postdata->{switch_ip} port $postdata->{port}.");
+    use Data::Dumper;
+    $logger->info(Dumper($postdata));
+    
+    return 1;
+}
+
 
 # Handle connection types $WIRED_SNMP_TRAPS
 sub _reassignSNMPConnections {
