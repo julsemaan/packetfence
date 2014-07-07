@@ -149,13 +149,28 @@ class Tutorial (object):
     mac = self.learn_new_mac(packet, packet_in)
     if mac:
         port = self.ports[mac]
-        self._authorize(str(mac), str(port), switch_ip)
+        if port == 8:
+            self.inform_nac(str(mac), str(port), switch_ip)
+        #self._authorize(packet, packet_in, str(mac), str(port), switch_ip)
 
 
-  def _authorize (self, mac, port, switch_ip):
+  def _authorize (self, packet, packet_in, mac, port, switch_ip):
+    if port == 8:
+        vlan = self.inform_nac(mac,port,switch_ip)
+        log.info("Node "+mac+" should have vlan "+vlan); 
+
+        msg = of.ofp_flow_mod()
+        msg.match.dl_src = mac
+        msg.match.in_port = int(port)
+        msg.actions.append(of.ofp_action_vlan_vid(vlan_vid=int(vlan)))
+        msg.actions.append(of.ofp_action_output(port = 1))
+        self.connection.send(msg)
+
+
+  def inform_nac(self, mac, port, switch_ip):
     PF_ADDRESS="127.0.0.1"
     PF_PORT="9090"
-    REQUEST = '{"jsonrpc": "2.0", "method": "openflow_authorize", "params": {"mac": "'+mac+'", "switch_ip": "'+switch_ip+'", "port": "'+port+'"}}'
+    REQUEST = '{"jsonrpc": "2.0", "id": "1", "method": "get_vlan", "params": {"mac": "'+mac+'", "switch_ip": "'+switch_ip+'", "port": "'+port+'"}}'
     print REQUEST 
     import sys
     import urllib
@@ -175,11 +190,14 @@ class Tutorial (object):
         print '-'*60
         print page
         print '-'*60
+        import json
+        data = json.loads(page);
+        return data['result'][0]
     except:
         print "Something bad happenned when authorizing with the server"
         traceback.print_exc(file=sys.stdout)
         print '-'*60
-       
+      
     
 
 def launch ():

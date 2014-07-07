@@ -229,14 +229,94 @@ sub firewall {
     $inline->performInlineEnforcement($postdata{'mac'});
 }
 
-sub openflow_authorize {
+sub get_vlan {
     my ($class, $postdata ) = @_;
     my $logger = pf::log::get_logger();
-    $logger->info("Authorizing $postdata->{mac} on switch $postdata->{switch_ip} port $postdata->{port}.");
     use Data::Dumper;
     $logger->info(Dumper($postdata));
-    
-    return 1;
+
+    use pf::config;
+    use pf::vlan::custom;
+
+    my $connection_type = 0;
+    my $ssid;
+    my $eap_type;
+    my $user_name;
+    my $mac = $postdata->{mac};
+    my $switch_ip = $postdata->{switch_ip};
+    my $switch_mac;
+    my $port = $postdata->{port};
+
+    $logger->info("Authorizing $mac on switch $switch_ip port $port.");
+
+    my $switch = pf::SwitchFactory->getInstance()->instantiate({ switch_ip => $switch_ip });
+
+    #add node if necessary
+    if ( !pf::node::node_exist($mac) ) {
+        $logger->info("node $mac does not yet exist in database. Adding it now");
+        pf::node::node_add_simple($mac);
+    }
+
+    # There is activity from that mac, call node wakeup
+    pf::node::node_mac_wakeup($mac);
+
+    my $switch_id =  $switch->{_id};
+
+    # verify if switch supports this connection type
+    #if (!$this->_isSwitchSupported($switch, $connection_type)) {
+    #    # if not supported, return
+    #    return $this->_switchUnsupportedReply($switch);
+    #}
+
+    # switch-specific information retrieval
+    #my $ssid;
+    #if (($connection_type & $WIRELESS) == $WIRELESS) {
+    #    $ssid = $switch->extractSsid($radius_request);
+    #    $logger->debug("SSID resolved to: $ssid") if (defined($ssid));
+    #}
+
+    # determine if we need to perform automatic registration
+    my $isPhone = $switch->isPhoneAtIfIndex($mac, $port);
+
+    my $vlan_obj = new pf::vlan::custom();
+    # should we auto-register? let's ask the VLAN object
+    if ($vlan_obj->shouldAutoRegister($mac, $switch->isRegistrationMode(), 0, $isPhone,
+        $connection_type, $user_name, $ssid, $eap_type, $switch, $port)) {
+
+        # automatic registration
+        my %autoreg_node_defaults = $vlan_obj->getNodeInfoForAutoReg($switch->{_id}, $port,
+            $mac, undef, $switch->isRegistrationMode(), $FALSE, $isPhone, $connection_type, $user_name, $ssid, $eap_type);
+
+        $logger->debug("auto-registering node $mac");
+        if (!pf::node::node_register($mac, $autoreg_node_defaults{'pid'}, %autoreg_node_defaults)) {
+            $logger->error("auto-registration of node $mac failed");
+        }
+        pf::locationlog::locationlog_synchronize($switch, $switch_ip, $switch_mac, $port, undef, $mac,
+            $isPhone ? $VOIP : $NO_VOIP, $connection_type, $user_name, $ssid
+        );
+    }
+
+    # if it's an IP Phone, let _authorizeVoip decide (extension point)
+    if ($isPhone) {
+        # do something intelligent
+    }
+
+    # Fetch VLAN depending on node status
+    my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $switch, $port, $connection_type, $user_name, $ssid);
+
+    # should this node be kicked out?
+    if (defined($vlan) && $vlan == -1) {
+        $logger->info("According to rules in fetchVlanForNode this node must be kicked out. Returning USERLOCK");
+        $switch->disconnectRead();
+        $switch->disconnectWrite();
+        return $vlan;
+    }
+
+    $logger->info("Returning VLAN $vlan");
+
+    $switch->authorizeMac($mac, "openflow:10194960720592896", $port ); 
+
+    return $vlan;
 }
 
 
