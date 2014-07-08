@@ -71,6 +71,14 @@ sub supportsExternalPortal {
     return $FALSE;
 }
 
+sub supportsFlows {
+    my ( $this ) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($this) );
+
+    $logger->error("Configuration by flows is not supported on switch type " . ref($this));
+    return $FALSE; 
+}
+
 =item supportsWiredMacAuth
 
 Returns 1 if switch type supports Wired MAC Authentication (Wired Access Authorization through RADIUS)

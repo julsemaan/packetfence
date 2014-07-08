@@ -64,13 +64,13 @@ class Tutorial (object):
     self.connection.send(msg)
 
   def learn_new_mac (self, packet, packet_in):
-    if not packet.src in self.macs:
+    if not str(packet.src) in self.macs:
         from pprint import pprint
         #pprint (vars(packet))
         log.info("I LEARNT A MAC "+str(packet.src)+" IT'S IN PORT "+str(packet_in.in_port));
-        self.macs.append(packet.src)
-        self.ports[packet.src] = packet_in.in_port
-        return packet.src
+        self.macs.append(str(packet.src))
+        self.ports[str(packet.src)] = str(packet_in.in_port)
+        return str(packet.src)
 
 
   def act_like_hub (self, packet, packet_in):
@@ -79,7 +79,7 @@ class Tutorial (object):
     the input port.
     """
     from pprint import pprint
-    if not packet.src in self.macs:
+    if not str(packet.src) in self.macs:
         log.info("I LEARNT A MAC "+str(packet.src));
         self.macs.append(packet.src)
 
@@ -149,13 +149,18 @@ class Tutorial (object):
     mac = self.learn_new_mac(packet, packet_in)
     if mac:
         port = self.ports[mac]
-        if port == 8:
+        if port != "1":
             self.inform_nac(str(mac), str(port), switch_ip)
-        #self._authorize(packet, packet_in, str(mac), str(port), switch_ip)
-
+    elif self.ports[str(packet.src)] != str(packet_in.in_port):
+        if str(packet_in.in_port) != "1":
+            log.info("MAC "+str(packet.src)+" MOVED")
+            self.ports[packet.src] = packet_in.in_port
+            self.inform_nac(str(packet.src), str(packet.in_port), switch_ip)
+    from pprint import pprint
+    #pprint(self.ports)
 
   def _authorize (self, packet, packet_in, mac, port, switch_ip):
-    if port == 8:
+    if port == "8":
         vlan = self.inform_nac(mac,port,switch_ip)
         log.info("Node "+mac+" should have vlan "+vlan); 
 
@@ -192,6 +197,8 @@ class Tutorial (object):
         print '-'*60
         import json
         data = json.loads(page);
+        del self.ports[mac]
+        self.macs.remove(mac)
         return data['result'][0]
     except:
         print "Something bad happenned when authorizing with the server"

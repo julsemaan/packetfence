@@ -25,6 +25,7 @@ use pf::util;
 use pf::config;
 
 sub description { 'OpenDaylight SDN controller' }
+sub supportsFlows { return $TRUE }
 sub getIfType{ return $SNMP::ETHERNET_CSMACD; }
 
 sub authorizeMac {

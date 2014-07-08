@@ -278,6 +278,11 @@ sub get_vlan {
     # determine if we need to perform automatic registration
     my $isPhone = $switch->isPhoneAtIfIndex($mac, $port);
 
+    # determine if we need to remove an old flow entry
+    my $old_location = pf::locationlog::locationlog_view_open_mac($mac);
+    $logger->error("DON'T FORGET TO CODE THE MAC MOVEMENT");
+
+
     my $vlan_obj = new pf::vlan::custom();
     # should we auto-register? let's ask the VLAN object
     if ($vlan_obj->shouldAutoRegister($mac, $switch->isRegistrationMode(), 0, $isPhone,
