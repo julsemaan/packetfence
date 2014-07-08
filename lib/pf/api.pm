@@ -314,7 +314,7 @@ sub get_vlan {
 
     $logger->info("Returning VLAN $vlan");
 
-    $switch->authorizeMac($mac, "openflow:10194960720592896", $port ); 
+    $switch->authorizeMac($mac, $vlan, $port ); 
 
     return $vlan;
 }
