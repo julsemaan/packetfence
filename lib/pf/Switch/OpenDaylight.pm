@@ -23,6 +23,7 @@ use WWW::Curl::Easy;
 use Log::Log4perl;
 use pf::util;
 use pf::config;
+use pf::vlan::custom;
 
 sub description { 'OpenDaylight SDN controller' }
 sub supportsFlows { return $TRUE }
@@ -32,20 +33,17 @@ sub authorizeMac {
     my ($self, $mac, $vlan, $port) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
     my @uplinks = $self->getUpLinks();
-    # delete a previous flow that could have been installed on that port
-    $self->delete_flow("outbound", $mac);
     # install a new outbound flow
     $self->install_tagged_outbound_flow($port, $uplinks[0], $mac, $vlan);
-    # delete a previous flow that could have been installed on that port
-    $self->delete_flow("inbound", $mac);
     # install a new inbound flow on the uplink
     $self->install_tagged_inbound_flow($uplinks[0], $port, $mac, $vlan );
+    # instal a flow for broadcast packets
+    $self->install_tagged_inbound_flow($uplinks[0], $port, "ff:ff:ff:ff:ff:ff", $vlan, "broadcast" );
 }
 
 sub get_flow_name{
     my ($self, $type, $mac) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
-    $logger->info("IN GET FLOW NAME");
     my $clean_mac = $mac;
     $clean_mac =~ s/://g;
 
@@ -55,9 +53,22 @@ sub get_flow_name{
     elsif($type eq "inbound"){
         return "inbound".$clean_mac; 
     }
+    elsif($type eq "broadcast"){
+        return "broadcast".$clean_mac;
+    }
     else{
         $logger->error("Invalid type sent. Returning nothing.");
     }
+}
+
+sub deauthorizeMac {
+    my ($self, $mac, $vlan, $port) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    my @uplinks = $self->getUpLinks();
+    $logger->info("Deleting flows for $mac on port $port on $self->{_ip}");
+    $self->delete_flow("outbound", $mac);
+    $self->delete_flow("inbound", $mac);
+    $self->delete_flow("broadcast", "ff:ff:ff:ff:ff:ff");
 }
 
 sub delete_flow {
@@ -69,7 +80,6 @@ sub delete_flow {
 sub send_json_request {
     my ($self, $path, $data, $method) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
-    $logger->info("IN SEND_JSON_REQUEST $path");
     my $url = "http://172.20.20.99:8080/$path";
     my $json_data = encode_json $data;
 
@@ -110,13 +120,14 @@ sub install_tagged_outbound_flow {
 }
 
 sub install_tagged_inbound_flow {
-    my ($self, $source_int, $dest_int, $mac, $vlan) = @_;
+    my ($self, $source_int, $dest_int, $mac, $vlan, $flow_prefix) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
 
-    
-    my $clean_mac = $mac;
-    $clean_mac =~ s/://g;
-    my $flow_name = $self->get_flow_name("inbound", $mac);
+    if(!defined($flow_prefix)){
+        $flow_prefix = "inbound";
+    }
+
+    my $flow_name = $self->get_flow_name($flow_prefix, $mac);
     my $path = "controller/nb/v2/flowprogrammer/default/node/MD_SAL/$self->{_OpenflowId}/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
 
@@ -140,6 +151,12 @@ sub install_tagged_inbound_flow {
    
 }
 
+sub handleReAssignVlanTrapForWiredMacAuth {
+    my ($self, $ifIndex, $mac) = @_;
+    my $vlan_obj = new pf::vlan::custom();    
+    my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $self, $ifIndex, undef, undef, undef);
+    $self->authorizeMac($mac, $vlan, $ifIndex);
+}
 
 #sub send_json_request {
 #    my ($self, $path, $data, $method) = @_;

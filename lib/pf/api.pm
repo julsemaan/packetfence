@@ -229,7 +229,7 @@ sub firewall {
     $inline->performInlineEnforcement($postdata{'mac'});
 }
 
-sub get_vlan {
+sub openflow_authorize {
     my ($class, $postdata ) = @_;
     my $logger = pf::log::get_logger();
     use Data::Dumper;
@@ -238,7 +238,7 @@ sub get_vlan {
     use pf::config;
     use pf::vlan::custom;
 
-    my $connection_type = 0;
+    my $connection_type = $WIRED_MAC_AUTH;
     my $ssid;
     my $eap_type;
     my $user_name;
@@ -280,8 +280,13 @@ sub get_vlan {
 
     # determine if we need to remove an old flow entry
     my $old_location = pf::locationlog::locationlog_view_open_mac($mac);
-    $logger->error("DON'T FORGET TO CODE THE MAC MOVEMENT");
-
+    use Data::Dumper;
+    $logger->info(Dumper($old_location));
+    my $old_switch = pf::SwitchFactory->getInstance()->instantiate({ switch_ip => $old_location->{switch_ip}, switch_mac => $old_location->{switch_mac} });
+    if($old_switch->supportsFlows()){
+        $logger->info("$mac moved between two supported openflow ports. Removing previous flows on $old_switch->{_ip} port $old_location->{port}");
+        $old_switch->deauthorizeMac($mac, $old_location->{vlan}, $old_location->{port}); 
+    }
 
     my $vlan_obj = new pf::vlan::custom();
     # should we auto-register? let's ask the VLAN object
@@ -308,6 +313,10 @@ sub get_vlan {
 
     # Fetch VLAN depending on node status
     my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $switch, $port, $connection_type, $user_name, $ssid);
+
+    $switch->synchronize_locationlog($port, $vlan, $mac,
+        $isPhone ? $VOIP : $NO_VOIP, $connection_type, $user_name, $ssid
+    ) if (!$wasInline);
 
     # should this node be kicked out?
     if (defined($vlan) && $vlan == -1) {

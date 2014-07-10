@@ -23,6 +23,7 @@ It's roughly similar to the one Brandon Heller did for NOX.
 
 from pox.core import core
 import pox.openflow.libopenflow_01 as of
+import time
 
 log = core.getLogger()
 
@@ -44,7 +45,7 @@ class Tutorial (object):
     # Use this table to keep track of which ethernet address is on
     # which switch port (keys are MACs, values are ports).
     self.mac_to_port = {}
-    self.macs = []
+    self.macs = {} 
     self.ports = {}
 
   def resend_packet (self, packet_in, out_port):
@@ -64,74 +65,20 @@ class Tutorial (object):
     self.connection.send(msg)
 
   def learn_new_mac (self, packet, packet_in):
-    if not str(packet.src) in self.macs:
+    if not self.macs.has_key(str(packet.src)):
         from pprint import pprint
         #pprint (vars(packet))
         log.info("I LEARNT A MAC "+str(packet.src)+" IT'S IN PORT "+str(packet_in.in_port));
-        self.macs.append(str(packet.src))
+        self.macs[str(packet.src)] = int(time.time()) 
         self.ports[str(packet.src)] = str(packet_in.in_port)
         return str(packet.src)
+    elif (int(time.time()) - self.macs[str(packet.src)]) > 30:
+        log.info("AN OLD MAC CAME BACK "+str(packet.src)+" IT'S IN PORT "+str(packet_in.in_port));
+        self.macs[str(packet.src)] = int(time.time()) 
+        self.ports[str(packet.src)] = str(packet_in.in_port)
+        return str(packet.src)
+       
 
-
-  def act_like_hub (self, packet, packet_in):
-    """
-    Implement hub-like behavior -- send all packets to all ports besides
-    the input port.
-    """
-    from pprint import pprint
-    if not str(packet.src) in self.macs:
-        log.info("I LEARNT A MAC "+str(packet.src));
-        self.macs.append(packet.src)
-
-    # We want to output to all ports -- we do that using the special
-    # OFPP_ALL port as the output port.  (We could have also used
-    # OFPP_FLOOD.)
-    self.resend_packet(packet_in, of.OFPP_ALL)
-
-    # Note that if we didn't get a valid buffer_id, a slightly better
-    # implementation would check that we got the full data before
-    # sending it (len(packet_in.data) should be == packet_in.total_len)).
-
-
-  def act_like_switch (self, packet, packet_in):
-    """
-    Implement switch-like behavior.
-    """
-
-    """ # DELETE THIS LINE TO START WORKING ON THIS (AND THE ONE BELOW!) #
-
-    # Here's some psuedocode to start you off implementing a learning
-    # switch.  You'll need to rewrite it as real Python code.
-
-    # Learn the port for the source MAC
-    self.mac_to_port ... <add or update entry>
-
-    if the port associated with the destination MAC of the packet is known:
-      # Send packet out the associated port
-      self.resend_packet(packet_in, ...)
-
-      # Once you have the above working, try pushing a flow entry
-      # instead of resending the packet (comment out the above and
-      # uncomment and complete the below.)
-
-      log.debug("Installing flow...")
-      # Maybe the log statement should have source/destination/port?
-
-      #msg = of.ofp_flow_mod()
-      #
-      ## Set fields to match received packet
-      #msg.match = of.ofp_match.from_packet(packet)
-      #
-      #< Set other fields of flow_mod (timeouts? buffer_id?) >
-      #
-      #< Add an output action, and send -- similar to resend_packet() >
-
-    else:
-      # Flood the packet out everything but the input port
-      # This part looks familiar, right?
-      self.resend_packet(packet_in, of.OFPP_ALL)
-
-    """ # DELETE THIS LINE TO START WORKING ON THIS #
 
 
   def _handle_PacketIn (self, event):
@@ -155,7 +102,7 @@ class Tutorial (object):
         if str(packet_in.in_port) != "1":
             log.info("MAC "+str(packet.src)+" MOVED")
             self.ports[packet.src] = packet_in.in_port
-            self.inform_nac(str(packet.src), str(packet.in_port), switch_ip)
+            self.inform_nac(str(packet.src), str(packet_in.in_port), switch_ip)
     from pprint import pprint
     #pprint(self.ports)
 
@@ -175,7 +122,7 @@ class Tutorial (object):
   def inform_nac(self, mac, port, switch_ip):
     PF_ADDRESS="127.0.0.1"
     PF_PORT="9090"
-    REQUEST = '{"jsonrpc": "2.0", "id": "1", "method": "get_vlan", "params": {"mac": "'+mac+'", "switch_ip": "'+switch_ip+'", "port": "'+port+'"}}'
+    REQUEST = '{"jsonrpc": "2.0", "id": "1", "method": "openflow_authorize", "params": {"mac": "'+mac+'", "switch_ip": "'+switch_ip+'", "port": "'+port+'"}}'
     print REQUEST 
     import sys
     import urllib
@@ -197,8 +144,7 @@ class Tutorial (object):
         print '-'*60
         import json
         data = json.loads(page);
-        del self.ports[mac]
-        self.macs.remove(mac)
+        import time
         return data['result'][0]
     except:
         print "Something bad happenned when authorizing with the server"
