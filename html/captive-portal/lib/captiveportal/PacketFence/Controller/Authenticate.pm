@@ -11,7 +11,6 @@ use pf::authentication;
 use HTML::Entities;
 use List::MoreUtils qw(any);
 use pf::config;
-use pf::factory::provisioner;
 
 
 BEGIN { extends 'captiveportal::Base::Controller'; }
@@ -193,8 +192,8 @@ sub postAuthentication : Private {
     my $portalSession = $c->portalSession;
     my $session = $c->session;
     my $profile = $c->profile;
-    my $info = $c->stash->{info} || {};
     my $source_id = $session->{source_id};
+    my $info = $c->stash->{info} ||= {};
     my $pid = $session->{"username"};
     $pid = $default_pid if _no_username($c->profile);
     $info->{pid} = $pid;
@@ -207,7 +206,6 @@ sub postAuthentication : Private {
         $params->{connection_type} = $locationlog_entry->{'connection_type'};
         $params->{SSID}            = $locationlog_entry->{'ssid'};
     }
-
     $c->stash->{matchParams} = $params;
     $c->stash->{info} = $info;
     $c->forward('setRole');
@@ -273,17 +271,14 @@ sub checkIfProvisionIsNeeded : Private {
     my $portalSession = $c->portalSession;
     my $info = $c->stash->{info};
     my $mac = $portalSession->clientMac;
-    my $provisioner_name = $c->profile->getProvisioner();
-    if (defined($provisioner_name)) {
-        my $provisioner = pf::factory::provisioner->new($provisioner_name);
-        $c->log->info("There is an provisioner : $provisioner_name");
+    my $profile = $c->profile;
+    if (defined( my $provisioner = $profile->findProvisioner($mac))) {
         unless ($provisioner->authorize($mac) == 1) {
             $info->{status} = $pf::node::STATUS_PENDING;
             node_modify($mac, %$info);
             $c->stash(
-                template      => 'provisioner.html',  
-                agent_download_uri => $provisioner->{'agent_download_uri'},
-                alt_agent_download_uri => $provisioner->{'alt_agent_download_uri'},
+                template    => $provisioner->template,
+                provisioner => $provisioner,
             );
             $c->detach();
         }
