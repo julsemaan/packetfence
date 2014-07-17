@@ -19,4 +19,4 @@ query="UPDATE node SET status='unreg' WHERE mac IN (select Node.mac from (select
 echo "Executing"
 echo "$query"
 
-mysql -u pf -p$(cat /root/pf_passwd) pf_42 -e "$query"
+mysql -u pf -p$(cat /root/pf_passwd) pf -e "$query"
