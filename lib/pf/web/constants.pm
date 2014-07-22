@@ -105,6 +105,7 @@ Readonly::Scalar our $REQ_MAC                   => 'mac';
 Readonly::Scalar our $REQ_ARUBA                 => 'apname';
 Readonly::Scalar our $REQ_CISCO_PORTAL          => '/cep(.*)';
 Readonly::Scalar our $REQ_RUCKUS                => 'sip';
+Readonly::Scalar our $REQ_AEROHIVE              => 'RADIUS-NAS-IP';
 
 # External Captive Portal URL detection constant
 Readonly::Scalar our $EXT_URL_XIRRUS            => '/Xirrus::AP_http';
