@@ -13,6 +13,7 @@ We must at least always have one rule defined, the fallback one.
 use Moose;
 use pf::Authentication::constants;
 use pf::Authentication::Action;
+use pf::config;
 
 has 'id' => (isa => 'Str', is => 'rw', required => 1);
 has 'unique' => (isa => 'Bool', is => 'ro', default => 0);
@@ -156,6 +157,9 @@ sub match {
                 # A condition on a source-specific attribute
                 push(@own_conditions, $condition);
             }
+            elsif ($self->supportsCustomAttributes) {
+                push(@own_conditions, $condition);
+            }
         } # foreach my $condition (...)
 
         # We always check if at least the returned value is defined. That means the username
@@ -203,6 +207,13 @@ sub match_condition {
   my $r = $condition->matches($condition->attribute, $params->{$condition->attribute});
 
   return $r;
+}
+
+sub supportsCustomAttributes {
+    my ($self) = @_;
+    my $logger = Log::Log4perl->get_logger( __PACKAGE__ );
+    $logger->error("This authentication module doesn't support custom attributes");
+    return $FALSE;
 }
 
 =head1 AUTHOR

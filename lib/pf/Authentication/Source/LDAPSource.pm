@@ -40,6 +40,12 @@ has 'usernameattribute' => ( isa => 'Str',        is => 'rw', required => 1 );
 
 =head1 METHODS
 
+=cut
+
+sub supportsCustomAttributes {
+    return $TRUE;
+}
+
 =head2 available_attributes
 
 =cut
@@ -401,6 +407,8 @@ sub bind_with_credentials {
     }
     return $result;
 }
+
+
 
 =head1 AUTHOR
 
