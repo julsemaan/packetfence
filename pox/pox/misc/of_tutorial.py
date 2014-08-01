@@ -24,7 +24,11 @@ It's roughly similar to the one Brandon Heller did for NOX.
 from pox.core import core
 import pox.openflow.libopenflow_01 as of
 import time
-
+import threading
+import sys
+import urllib
+import urllib2
+import traceback
 log = core.getLogger()
 
 
@@ -106,17 +110,17 @@ class Tutorial (object):
     from pprint import pprint
     #pprint(self.ports)
 
-  def _authorize (self, packet, packet_in, mac, port, switch_ip):
-    if port == "8":
-        vlan = self.inform_nac(mac,port,switch_ip)
-        log.info("Node "+mac+" should have vlan "+vlan); 
+  #def _authorize (self, packet, packet_in, mac, port, switch_ip):
+  #  if port == "8":
+  #      vlan = self.inform_nac(mac,port,switch_ip)
+  #      log.info("Node "+mac+" should have vlan "+vlan); 
 
-        msg = of.ofp_flow_mod()
-        msg.match.dl_src = mac
-        msg.match.in_port = int(port)
-        msg.actions.append(of.ofp_action_vlan_vid(vlan_vid=int(vlan)))
-        msg.actions.append(of.ofp_action_output(port = 1))
-        self.connection.send(msg)
+  #      msg = of.ofp_flow_mod()
+  #      msg.match.dl_src = mac
+  #      msg.match.in_port = int(port)
+  #      msg.actions.append(of.ofp_action_vlan_vid(vlan_vid=int(vlan)))
+  #      msg.actions.append(of.ofp_action_output(port = 1))
+  #      self.connection.send(msg)
 
 
   def inform_nac(self, mac, port, switch_ip):
@@ -124,32 +128,32 @@ class Tutorial (object):
     PF_PORT="9090"
     REQUEST = '{"jsonrpc": "2.0", "id": "1", "method": "openflow_authorize", "params": {"mac": "'+mac+'", "switch_ip": "'+switch_ip+'", "port": "'+port+'"}}'
     print REQUEST 
-    import sys
-    import urllib
-    import urllib2
-    import traceback
+
     url="http://"+PF_ADDRESS+":"+PF_PORT+"/"
 
     req = urllib2.Request(url)
     req.add_header("Content-Type", "application/json-rpc")
     req.add_data(REQUEST)
+    
+    t = threading.Thread(target=http_inform, args=(req,))
+    t.start()
 
-    page = None
-    try:
-        response= urllib2.urlopen(req)
-        page=response.read()
-        print "Received this document from the server"
-        print '-'*60
-        print page
-        print '-'*60
-        import json
-        data = json.loads(page);
-        import time
-        return data['result'][0]
-    except:
-        print "Something bad happenned when authorizing with the server"
-        traceback.print_exc(file=sys.stdout)
-        print '-'*60
+#    page = None
+#    try:
+#        response= urllib2.urlopen(req)
+#        page=response.read()
+#        print "Received this document from the server"
+#        print '-'*60
+#        print page
+#        print '-'*60
+#        import json
+#        data = json.loads(page);
+#        import time
+#        return data['result'][0]
+#    except:
+#        print "Something bad happenned when authorizing with the server"
+#        traceback.print_exc(file=sys.stdout)
+#        print '-'*60
       
     
 
@@ -162,3 +166,19 @@ def launch ():
     Tutorial(event.connection)
   core.openflow.addListenerByName("ConnectionUp", start_switch)
 
+def http_inform(req):
+    try:
+        response= urllib2.urlopen(req)
+        page=response.read()
+        print "Received this document from the server"
+        print '-'*60
+        print page
+        print '-'*60
+        import json
+        data = json.loads(page);
+        return data['result'][0]
+    except:
+        print "Something bad happenned when authorizing with the server"
+        traceback.print_exc(file=sys.stdout)
+        print '-'*60
+ 
