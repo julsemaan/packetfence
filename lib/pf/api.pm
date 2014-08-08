@@ -252,7 +252,7 @@ sub openflow_authorize {
 
     if ($switch->isUpLink($port)){
         $logger->info("Received an openflow authorize to an uplink. Not doing anything");
-        return;
+        return {message => "ignored"};
     }
     else{
         $logger->info("Authorizing $mac on switch $switch_id port $port.");
@@ -267,20 +267,7 @@ sub openflow_authorize {
     # There is activity from that mac, call node wakeup
     pf::node::node_mac_wakeup($mac);
 
-    my $switch_id =  $switch->{_id};
-
-    # verify if switch supports this connection type
-    #if (!$this->_isSwitchSupported($switch, $connection_type)) {
-    #    # if not supported, return
-    #    return $this->_switchUnsupportedReply($switch);
-    #}
-
-    # switch-specific information retrieval
-    #my $ssid;
-    #if (($connection_type & $WIRELESS) == $WIRELESS) {
-    #    $ssid = $switch->extractSsid($radius_request);
-    #    $logger->debug("SSID resolved to: $ssid") if (defined($ssid));
-    #}
+    $switch_id =  $switch->{_id};
 
     # determine if we need to perform automatic registration
     my $isPhone = $switch->isPhoneAtIfIndex($mac, $port);
@@ -339,7 +326,7 @@ sub openflow_authorize {
 
     $switch->authorizeMac($mac, $vlan, $port ); 
 
-    return $vlan;
+    return {vlan => $vlan, message => "continue"};
 }
 
 
