@@ -89,13 +89,13 @@ sub deauthorizeMac {
 sub delete_flow {
     my ($self, $type, $mac) = @_;
     my $flow_name = $self->get_flow_name($type, $mac);
-    $self->send_json_request("controller/nb/v2/flowprogrammer/default/node/MD_SAL/$self->{_OpenflowId}/staticFlow/$flow_name", {}, "DELETE");
+    $self->send_json_request("controller/nb/v2/flowprogrammer/default/node/OF/$self->{_OpenflowId}/staticFlow/$flow_name", {}, "DELETE");
 }
 
 sub send_json_request {
     my ($self, $path, $data, $method) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
-    my $url = "http://172.20.20.31:8080/$path";
+    my $url = "http://172.20.155.100:8080/$path";
     my $json_data = encode_json $data;
 
     my $command = 'curl -u admin:admin -X '.$method.' -d \''.$json_data.'\' --header "Content-type: application/json" '.$url; 
@@ -112,21 +112,21 @@ sub install_tagged_outbound_flow {
     my $clean_mac = $mac;
     $clean_mac =~ s/://g;
     my $flow_name = $self->get_flow_name("outbound", $mac);
-    my $path = "controller/nb/v2/flowprogrammer/default/node/MD_SAL/$self->{_OpenflowId}/staticFlow/$flow_name";
+    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$self->{_OpenflowId}/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
     my %data = (
         "installInHw" => "true",
         "name" => "$flow_name",
         "node" => {
             "id" => $self->{_OpenflowId},
-            "type" => "MD_SAL",
+            "type" => "OF",
         },
-        "ingressPort" => "$self->{_OpenflowId}:$source_int",
+        "ingressPort" => "$source_int",
         "priority" => "500",
         "dlSrc" => "$mac",
         "actions" => [
             "SET_VLAN_ID=$vlan",
-            "OUTPUT=$self->{_OpenflowId}:$dest_int",
+            "OUTPUT=$dest_int",
         ],
     );
     
@@ -143,22 +143,22 @@ sub install_tagged_inbound_flow {
     }
 
     my $flow_name = $self->get_flow_name($flow_prefix, $mac);
-    my $path = "controller/nb/v2/flowprogrammer/default/node/MD_SAL/$self->{_OpenflowId}/staticFlow/$flow_name";
+    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$self->{_OpenflowId}/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
 
     my %data = (
         "name" => $flow_name,
         "node" => {
             "id" => $self->{_OpenflowId},
-            "type" => "MD_SAL",
+            "type" => "OF",
         },
-        "ingressPort" => "$self->{_OpenflowId}:$source_int",
+        "ingressPort" => "$source_int",
         "priority" => "500",
         "vlanId" => $vlan,
         "dlDst" => $mac,
         "installInHw" => "true",
         "actions" => [
-            "OUTPUT=$self->{_OpenflowId}:$dest_int"
+            "OUTPUT=$dest_int"
         ]
     );
     
@@ -175,16 +175,16 @@ sub install_drop_flow {
     }
 
     my $flow_name = $self->get_flow_name($flow_prefix, $mac);
-    my $path = "controller/nb/v2/flowprogrammer/default/node/MD_SAL/$self->{_OpenflowId}/staticFlow/$flow_name";
+    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$self->{_OpenflowId}/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
 
     my %data = (
         "name" => $flow_name,
         "node" => {
             "id" => $self->{_OpenflowId},
-            "type" => "MD_SAL",
+            "type" => "OF",
         },
-        "ingressPort" => "$self->{_OpenflowId}:$source_int",
+        "ingressPort" => "$source_int",
         "priority" => "500",
         "installInHw" => "true",
         "actions" => [
