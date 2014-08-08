@@ -243,13 +243,20 @@ sub openflow_authorize {
     my $eap_type;
     my $user_name;
     my $mac = $postdata->{mac};
-    my $switch_ip = $postdata->{switch_ip};
+    my $switch_id = $postdata->{switch_id};
     my $switch_mac;
     my $port = $postdata->{port};
 
-    $logger->info("Authorizing $mac on switch $switch_ip port $port.");
 
-    my $switch = pf::SwitchFactory->getInstance()->instantiate({ switch_ip => $switch_ip });
+    my $switch = pf::SwitchFactory->getInstance()->instantiate($switch_id);
+
+    if ($switch->isUpLink($port)){
+        $logger->info("Received an openflow authorize to an uplink. Not doing anything");
+        return;
+    }
+    else{
+        $logger->info("Authorizing $mac on switch $switch_id port $port.");
+    }
 
     #add node if necessary
     if ( !pf::node::node_exist($mac) ) {
@@ -282,11 +289,13 @@ sub openflow_authorize {
     my $old_location = pf::locationlog::locationlog_view_open_mac($mac);
     use Data::Dumper;
     $logger->info(Dumper($old_location));
-    my $old_switch = pf::SwitchFactory->getInstance()->instantiate({ switch_ip => $old_location->{switch_ip}, switch_mac => $old_location->{switch_mac} });
-    if($old_switch->supportsFlows()){
-        $logger->info("$mac moved between two supported openflow ports. Removing previous flows on $old_switch->{_ip} port $old_location->{port}");
-        $old_switch->deauthorizeMac($mac, $old_location->{vlan}, $old_location->{port}); 
-    }
+    eval{
+        my $old_switch = pf::SwitchFactory->getInstance()->instantiate({ switch_ip => $old_location->{switch_ip}, switch_mac => $old_location->{switch_mac} });
+        if($old_switch->supportsFlows()){
+            $logger->info("$mac moved between two supported openflow ports. Removing previous flows on $old_switch->{_ip} port $old_location->{port}");
+            $old_switch->deauthorizeMac($mac, $old_location->{vlan}, $old_location->{port}); 
+        }
+    };
 
     my $vlan_obj = new pf::vlan::custom();
     # should we auto-register? let's ask the VLAN object
@@ -301,7 +310,7 @@ sub openflow_authorize {
         if (!pf::node::node_register($mac, $autoreg_node_defaults{'pid'}, %autoreg_node_defaults)) {
             $logger->error("auto-registration of node $mac failed");
         }
-        pf::locationlog::locationlog_synchronize($switch, $switch_ip, $switch_mac, $port, undef, $mac,
+        pf::locationlog::locationlog_synchronize($switch, $switch_id, $switch_id, $port, undef, $mac,
             $isPhone ? $VOIP : $NO_VOIP, $connection_type, $user_name, $ssid
         );
     }
