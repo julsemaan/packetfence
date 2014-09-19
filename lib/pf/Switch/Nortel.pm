@@ -55,6 +55,7 @@ sub supportsFloatingDevice { return $TRUE; }
 
 # special features
 sub supportsLldp { return $TRUE; }
+sub supportsWiredDot1x { return $TRUE }
 
 =back
 
