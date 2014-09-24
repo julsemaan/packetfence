@@ -1,2 +1,3 @@
 DEFAULT EAP-Message !* "", Auth-Type := Accept
 CP-7941G-SEP0024C4429B0F Cleartext-Password := "111111", Auth-Type := Accept
+CP-7941G-SEP0024C40B4B2D Cleartext-Password := "111111", Auth-Type := Accept
