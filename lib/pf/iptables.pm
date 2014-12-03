@@ -667,6 +667,15 @@ sub generate_provisioning_passthroughs {
         @lines  = pf_run($cmd); 
     }
 
+    foreach my $config (pf::ConfigStore::Provisioning->new->search(type => 'trend_micro')) {
+        $logger->info("Adding passthrough for Trend Micro MDM");
+        # Allow http communication with the MobileIron server
+        my $cmd = "LANG=C sudo ipset --add pfsession_passthrough $config->{host},$config->{enrolment_port} 2>&1";
+        my @lines  = pf_run($cmd); 
+        # Allow https communication with the MobileIron server
+        $cmd = "LANG=C sudo ipset --add pfsession_passthrough $config->{host},4343 2>&1";
+        @lines  = pf_run($cmd); 
+    }
 
 }
 
