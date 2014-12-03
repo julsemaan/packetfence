@@ -70,8 +70,11 @@ sub get_flow_name{
     elsif($type eq "drop"){
         return "drop".$clean_mac;
     }   
-    elsif($type eq "dnsredirect"){
-        return "dnsredirect".$clean_mac;
+    elsif($type eq "dnsredirect-in"){
+        return "dnsredirect-in-".$clean_mac;
+    }
+    elsif($type eq "dnsredirect-out"){
+        return "dnsredirect-out-".$clean_mac;
     }
     else{
         $logger->error("Invalid type sent. Returning something that should work.");
@@ -275,7 +278,7 @@ sub install_dns_redirect {
 
     #$self->block_network_detection($ifIndex, $mac);
 
-    my $flow_name = $self->get_flow_name("dnsredirect", $mac);
+    my $flow_name = $self->get_flow_name("dnsredirect-out", $mac);
     my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
 
@@ -285,11 +288,11 @@ sub install_dns_redirect {
             "id" => $switch_id,
             "type" => "OF",
         },
-        "ingressPort" => "$ifIndex",
+        #"ingressPort" => "$ifIndex",
         "dlSrc" => $mac,
         "priority" => "1000",
         "etherType" => "0x800",
-        "nwDst" => "0.0.0.0/0",
+        #"nwDst" => "0.0.0.0/0",
         "tpDst" => "53",
         "protocol" => "udp",
         "installInHw" => "true",
@@ -297,7 +300,34 @@ sub install_dns_redirect {
             "CONTROLLER"
         ]
     );
-    return $self->send_json_request($path, \%data, "PUT");
+    my $success_out = $self->send_json_request($path, \%data, "PUT");
+
+    $flow_name = $self->get_flow_name("dnsredirect-in", $mac);
+    $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
+    $logger->info("Computed path is : $path");
+
+    %data = (
+        "name" => $flow_name,
+        "node" => {
+            "id" => $switch_id,
+            "type" => "OF",
+        },
+        #"ingressPort" => "$ifIndex",
+        "dlDst" => $mac,
+        "priority" => "1000",
+        "etherType" => "0x800",
+        #"nwDst" => "0.0.0.0/0",
+        "tpSrc" => "53",
+        "protocol" => "udp",
+        "installInHw" => "true",
+        "actions" => [
+            "CONTROLLER"
+        ]
+    );
+    my $success_in = $self->send_json_request($path, \%data, "PUT");
+    
+    return $success_out && $success_in;
+
 }
 
 sub uninstall_dns_redirect {
@@ -305,7 +335,9 @@ sub uninstall_dns_redirect {
     my $logger = Log::Log4perl::get_logger( ref($self) );
 
     #$self->find_and_delete_flow("dnsredirect", $mac);
-    my $flow_name = $self->get_flow_name("dnsredirect", $mac);
+    my $flow_name = $self->get_flow_name("dnsredirect-out", $mac);
+    $self->deactivate_flow($flow_name); 
+    $flow_name = $self->get_flow_name("dnsredirect-in", $mac);
     $self->deactivate_flow($flow_name); 
 
     return $TRUE;
@@ -314,8 +346,11 @@ sub uninstall_dns_redirect {
 sub reactivate_dns_redirect {
     my ($self, $ifIndex, $mac) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
-    my $flow_name = $self->get_flow_name("dnsredirect", $mac);
-    return $self->reactivate_flow($flow_name); 
+    my $flow_name = $self->get_flow_name("dnsredirect-out", $mac);
+    my $success_out = $self->reactivate_flow($flow_name); 
+    $flow_name = $self->get_flow_name("dnsredirect-in", $mac);
+    my $success_in = $self->reactivate_flow($flow_name); 
+    return $success_in && $success_out;
 }
 
 sub find_flow_by_name {
