@@ -281,28 +281,22 @@ sub sdn_authorize {
     my $role = $roles_obj->getRoleForNode($mac, $switch);
 
     if (!defined($info) || $violation_count > 0 || $info->{status} eq $pf::node::STATUS_UNREGISTERED || $info->{status} eq $pf::node::STATUS_PENDING){
-        if($switch->{_IsolationStrategy} eq "VLAN"){
+        if($switch->getIsolationStrategy eq "VLAN"){
             $class->sdn_vlan_authorize($postdata) || return { action => "failed" };
         }
-        elsif($switch->{_IsolationStrategy} eq "DNS"){
-            $switch->install_dns_redirect($port, $mac, $switch_id) || return { action => "failed" };
+        else{
+            $switch->isolate_device($port, $mac, $switch_id) || return { action => "failed" };
         }
-        elsif($switch->{_IsolationStrategy} eq "WEB"){
-            $switch->install_web_redirect($port, $mac, $switch_id) || return { action => "failed" };
-        }
-        return { action => "isolate", strategy => $switch->{_IsolationStrategy} };
+        return { action => "isolate", strategy => $switch->getIsolationStrategy };
     } 
     else{
-        if($switch->{_IsolationStrategy} eq "VLAN"){
+        if($switch->getIsolationStrategy eq "VLAN"){
             $class->sdn_vlan_authorize($postdata) || return { action => "failed" };
         }
-        elsif($switch->{_IsolationStrategy} eq "DNS"){
-            $switch->uninstall_dns_redirect($port, $mac) || return {action => "failed"};
+        else{
+            $switch->release_device($port, $mac) || return {action => "failed"};
         }
-        elsif($switch->{_IsolationStrategy} eq "WEB"){
-            $switch->uninstall_web_redirect($port, $mac) || return {action => "failed"};
-        }
-        return { action => "accept", strategy => $switch->{_IsolationStrategy} , role => $role } ;
+        return { action => "accept", strategy => $switch->getIsolationStrategy , role => $role } ;
     }
 }
 

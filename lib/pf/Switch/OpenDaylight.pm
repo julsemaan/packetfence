@@ -31,6 +31,25 @@ sub description { 'OpenDaylight SDN controller' }
 sub supportsFlows { return $TRUE }
 sub getIfType{ return $SNMP::ETHERNET_CSMACD; }
 
+sub getIsolationStrategy {return "VLAN"}
+
+sub release_device {
+    my ($self, $ifIndex, $mac) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    $logger->warn("Not implemented");
+}
+sub reisolate_device {
+    my ($self, $ifIndex, $mac) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    $logger->warn("Not implemented");
+}
+sub isolate_device {
+    my ($self, $ifIndex, $mac, $switch_id) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    $logger->warn("Not implemented");
+}
+
+
 sub authorizeMac {
     my ($self, $mac, $vlan, $port, $switch_id) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
@@ -58,40 +77,7 @@ sub get_flow_name{
     my $clean_mac = $mac;
     $clean_mac =~ s/://g;
 
-    if($type eq "outbound"){
-        return "outbound".$clean_mac;
-    }
-    elsif($type eq "inbound"){
-        return "inbound".$clean_mac; 
-    }
-    elsif($type eq "broadcast"){
-        return "broadcast".$clean_mac;
-    }
-    elsif($type eq "drop"){
-        return "drop".$clean_mac;
-    }   
-    elsif($type eq "dnsredirect-in"){
-        return "dnsredirect-in-".$clean_mac;
-    }
-    elsif($type eq "dnsredirect-out"){
-        return "dnsredirect-out-".$clean_mac;
-    }
-    elsif($type eq "webredirect-in"){
-        return "webredirect-in-".$clean_mac;
-    }
-    elsif($type eq "webredirect-out"){
-        return "webredirect-out-".$clean_mac;
-    }
-    elsif($type eq "webredirect-whitelist-in"){
-        return "webredirect-whitelist-in-".$clean_mac;
-    }
-    elsif($type eq "webredirect-whitelist-out"){
-        return "webredirect-whitelist-out-".$clean_mac;
-    }
-    else{
-        $logger->error("Invalid type sent. Returning something that should work.");
-        return $type.$clean_mac;
-    }
+    return "$type-$clean_mac";
 }
 
 sub deauthorizeMac {
@@ -232,28 +218,20 @@ sub handleReAssignVlanTrapForWiredMacAuth {
     my $vlan_obj = new pf::vlan::custom();    
     my $info = pf::node::node_view($mac);
     my $violation_count = pf::violation::violation_count_trap($mac);
-    my $device_ok = (!defined($info) || $violation_count > 0 || $info->{status} eq $pf::node::STATUS_UNREGISTERED || $info->{status} eq $pf::node::STATUS_PENDING);
+    my $device_not_ok = (!defined($info) || $violation_count > 0 || $info->{status} eq $pf::node::STATUS_UNREGISTERED || $info->{status} eq $pf::node::STATUS_PENDING);
 
     if($self->{_IsolationStrategy} eq "VLAN"){
         my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $self, $ifIndex, undef, undef, undef);
         $self->deauthorizeMac($mac, $vlan, $ifIndex);
         $self->authorizeMac($mac, $vlan, $ifIndex);
     }
-    elsif($self->{_IsolationStrategy} eq "DNS"){
-        if ($device_ok){
-            $self->reactivate_dns_redirect($ifIndex, $mac);
+    else{
+        if ($device_not_ok){
+            $self->reisolate_device($ifIndex, $mac);
         }
         else{
-            $self->uninstall_dns_redirect($ifIndex, $mac);
+            $self->release_device($ifIndex, $mac);
         }
-    }
-    elsif($self->{_IsolationStrategy} eq "WEB"){
-        if ($device_ok){
-            $self->reactivate_web_redirect($ifIndex, $mac);
-        }
-        else{
-            $self->uninstall_web_redirect($ifIndex, $mac);
-        }       
     }
 }
 
@@ -287,78 +265,13 @@ sub block_network_detection {
 
 }
 
-sub install_web_whitelist {
-    my ($self, $ifIndex, $mac, $switch_id) = @_;
+
+
+sub install_redirect_out {
+    my ($self, $ifIndex, $mac, $switch_id, $flow_name, $tpDst, $protocol) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
     
-    my $flow_name = $self->get_flow_name("webredirect-whitelist-out", $mac);
-    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
-    $logger->info("Computed path is : $path");
-
-    my %data = (
-        "name" => $flow_name,
-        "node" => {
-            "id" => $switch_id,
-            "type" => "OF",
-        },
-        #"ingressPort" => "$ifIndex",
-        "dlSrc" => $mac,
-        "priority" => "1001",
-        "etherType" => "0x800",
-        "nwDst" => "172.20.20.109",
-        #"nwDst" => "0.0.0.0/0",
-        "tpDst" => "80",
-        "protocol" => "tcp",
-        "installInHw" => "true",
-        "actions" => [
-            "OUTPUT=1"
-        ]
-    );
-    my $success_out = $self->send_json_request($path, \%data, "PUT");
-
-    $flow_name = $self->get_flow_name("webredirect-whitelist-in", $mac);
-    $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
-    $logger->info("Computed path is : $path");
-
-    %data = (
-        "name" => $flow_name,
-        "node" => {
-            "id" => $switch_id,
-            "type" => "OF",
-        },
-        #"ingressPort" => "$ifIndex",
-        "dlDst" => $mac,
-        "priority" => "1001",
-        "etherType" => "0x800",
-        "nwSrc" => "172.20.20.109",
-        #"nwDst" => "0.0.0.0/0",
-        "tpSrc" => "80",
-        "protocol" => "tcp",
-        "installInHw" => "true",
-        "actions" => [
-            "OUTPUT=$ifIndex"
-        ]
-    );
-    my $success_in = $self->send_json_request($path, \%data, "PUT");
-    
-    return $success_out && $success_in;
-
-}
-
-sub install_web_redirect {
-    my ($self, $ifIndex, $mac, $switch_id) = @_;
-    my $logger = Log::Log4perl::get_logger( ref($self) );
-    
-    if ( $self->reactivate_web_redirect($ifIndex, $mac) ){
-        $logger->warn("Couldn't reactivate webredirect. Installing a new one");
-        return $TRUE;
-    }
-
-    if (! $self->install_web_whitelist($ifIndex, $mac, $switch_id) ){
-        return $FALSE;
-    }
-
-    my $flow_name = $self->get_flow_name("webredirect-out", $mac);
+ 
     my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
 
@@ -373,79 +286,20 @@ sub install_web_redirect {
         "priority" => "1000",
         "etherType" => "0x800",
         #"nwDst" => "0.0.0.0/0",
-        "tpDst" => "80",
-        "protocol" => "tcp",
+        "tpDst" => $tpDst,
+        "protocol" => $protocol,
         "installInHw" => "true",
         "actions" => [
             "CONTROLLER"
         ]
     );
-    my $success_out = $self->send_json_request($path, \%data, "PUT");
-
-    $flow_name = $self->get_flow_name("webredirect-in", $mac);
-    $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
-    $logger->info("Computed path is : $path");
-
-    %data = (
-        "name" => $flow_name,
-        "node" => {
-            "id" => $switch_id,
-            "type" => "OF",
-        },
-        #"ingressPort" => "$ifIndex",
-        "dlDst" => $mac,
-        "priority" => "1000",
-        "etherType" => "0x800",
-        #"nwDst" => "0.0.0.0/0",
-        "tpSrc" => "80",
-        "protocol" => "tcp",
-        "installInHw" => "true",
-        "actions" => [
-            "CONTROLLER"
-        ]
-    );
-    my $success_in = $self->send_json_request($path, \%data, "PUT");
-    
-    return $success_out && $success_in;
-
+    return $self->send_json_request($path, \%data, "PUT");   
 }
 
-sub uninstall_web_redirect {
-    my ($self, $ifIndex, $mac) = @_;
+sub install_redirect_in {
+    my ($self, $ifIndex, $mac, $switch_id, $flow_name, $tpSrc, $protocol) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
 
-    #$self->find_and_delete_flow("dnsredirect", $mac);
-    my $flow_name = $self->get_flow_name("webredirect-out", $mac);
-    $self->deactivate_flow($flow_name); 
-    $flow_name = $self->get_flow_name("webredirect-in", $mac);
-    $self->deactivate_flow($flow_name); 
-
-    return $TRUE;
-}
-
-sub reactivate_web_redirect {
-    my ($self, $ifIndex, $mac) = @_;
-    my $logger = Log::Log4perl::get_logger( ref($self) );
-    my $flow_name = $self->get_flow_name("webredirect-out", $mac);
-    my $success_out = $self->reactivate_flow($flow_name); 
-    $flow_name = $self->get_flow_name("webredirect-in", $mac);
-    my $success_in = $self->reactivate_flow($flow_name); 
-    return $success_in && $success_out;
-}
-
-sub install_dns_redirect {
-    my ($self, $ifIndex, $mac, $switch_id) = @_;
-    my $logger = Log::Log4perl::get_logger( ref($self) );
-    
-    if ( $self->reactivate_dns_redirect($ifIndex, $mac) ){
-        $logger->warn("Couldn't reactivate dnsredirect. Installing a new one");
-        return $TRUE;
-    }
-
-
-    #$self->block_network_detection($ifIndex, $mac);
-
-    my $flow_name = $self->get_flow_name("dnsredirect-out", $mac);
     my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
     $logger->info("Computed path is : $path");
 
@@ -456,68 +310,19 @@ sub install_dns_redirect {
             "type" => "OF",
         },
         #"ingressPort" => "$ifIndex",
-        "dlSrc" => $mac,
-        "priority" => "1000",
-        "etherType" => "0x800",
-        #"nwDst" => "0.0.0.0/0",
-        "tpDst" => "53",
-        "protocol" => "udp",
-        "installInHw" => "true",
-        "actions" => [
-            "CONTROLLER"
-        ]
-    );
-    my $success_out = $self->send_json_request($path, \%data, "PUT");
-
-    $flow_name = $self->get_flow_name("dnsredirect-in", $mac);
-    $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
-    $logger->info("Computed path is : $path");
-
-    %data = (
-        "name" => $flow_name,
-        "node" => {
-            "id" => $switch_id,
-            "type" => "OF",
-        },
-        #"ingressPort" => "$ifIndex",
         "dlDst" => $mac,
         "priority" => "1000",
         "etherType" => "0x800",
         #"nwDst" => "0.0.0.0/0",
-        "tpSrc" => "53",
-        "protocol" => "udp",
+        "tpSrc" => $tpSrc,
+        "protocol" => $protocol,
         "installInHw" => "true",
         "actions" => [
             "CONTROLLER"
         ]
     );
-    my $success_in = $self->send_json_request($path, \%data, "PUT");
-    
-    return $success_out && $success_in;
-
-}
-
-sub uninstall_dns_redirect {
-    my ($self, $ifIndex, $mac) = @_;
-    my $logger = Log::Log4perl::get_logger( ref($self) );
-
-    #$self->find_and_delete_flow("dnsredirect", $mac);
-    my $flow_name = $self->get_flow_name("dnsredirect-out", $mac);
-    $self->deactivate_flow($flow_name); 
-    $flow_name = $self->get_flow_name("dnsredirect-in", $mac);
-    $self->deactivate_flow($flow_name); 
-
-    return $TRUE;
-}
-
-sub reactivate_dns_redirect {
-    my ($self, $ifIndex, $mac) = @_;
-    my $logger = Log::Log4perl::get_logger( ref($self) );
-    my $flow_name = $self->get_flow_name("dnsredirect-out", $mac);
-    my $success_out = $self->reactivate_flow($flow_name); 
-    $flow_name = $self->get_flow_name("dnsredirect-in", $mac);
-    my $success_in = $self->reactivate_flow($flow_name); 
-    return $success_in && $success_out;
+    return $self->send_json_request($path, \%data, "PUT");
+ 
 }
 
 sub find_flow_by_name {
@@ -577,96 +382,6 @@ sub toggle_flow {
 
     return $self->send_json_request($path, {}, "POST");
 }
-
-
-
-#sub uninstall_dns_redirect {
-#    my ($self, $ifIndex, $mac) = @_;
-#    my $logger = Log::Log4perl::get_logger( ref($self) );
-#    
-#    my $flow_name = $self->get_flow_name("dnsredirect", $mac);
-#    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$self->{_OpenflowId}/staticFlow/$flow_name";
-#    $logger->info("Computed path is : $path");
-#
-#    my %data = (
-#        "name" => $flow_name,
-#        "node" => {
-#            "id" => $self->{_OpenflowId},
-#            "type" => "OF",
-#        },
-#        "ingressPort" => "$ifIndex",
-#        "dlSrc" => $mac,
-#        "priority" => "1002",
-#        "etherType" => "0x800",
-#        "nwDst" => "0.0.0.0/0",
-#        "tpDst" => "53",
-#        "protocol" => "udp",
-#        "installInHw" => "true",
-#        "actions" => [
-#            "FLOOD"
-#        ]
-#    );
-#
-#
-#    #$self->delete_flow("block-network-detection", $mac);
-#
-#    return $self->send_json_request($path, \%data, "PUT");
-#}
-
-#sub send_json_request {
-#    my ($self, $path, $data, $method) = @_;
-#    my $logger = Log::Log4perl::get_logger( ref($self) );
-#    my $url = "http://172.20.20.99:8080/$path";
-#    my $json_data = encode_json $data;
-#    my $curl = WWW::Curl::Easy->new;
-#    $curl->setopt(CURLOPT_HEADER, 1);
-#    #$curl->setopt(CURLOPT_DNS_USE_GLOBAL_CACHE, 0);
-#    #$curl->setopt(CURLOPT_NOSIGNAL, 1);
-#    $curl->setopt(CURLOPT_URL, $url);
-#    $curl->setopt(CURLOPT_HTTPHEADER, ['Content-type: application/json', 'Authorization: Basic YWRtaW46YWRtaW4=']);
-#    #$curl->setopt(CURLOPT_HTTPAUTH, CURLOPT_HTTPAUTH);
-#    #$curl->setopt(CURLOPT_USERNAME, "admin");
-#    #$curl->setopt(CURLOPT_PASSWORD, "admin");
-#    
-#
-#
-#    my $request = $json_data;
-#    my $response_body;
-#    my $response;
-#    #$curl->setopt(CURLOPT_POSTFIELDSIZE,length($request));
-#    #$curl->setopt(CURLOPT_POST, 1);
-#    if($method eq "PUT"){
-#        $logger->info("USING PUT");
-#        $curl->setopt(CURLOPT_PUT, 1);     
-#    }   
-#    $curl->setopt(CURLOPT_POSTFIELDS, $request);
-#    $curl->setopt(CURLOPT_WRITEDATA, \$response_body);
-#
-#    use Data::Dumper;
-#    $logger->info($json_data);
-#    # Starts the actual request
-#    my $curl_return_code = $curl->perform;
-#
-#    if ( $curl_return_code == 0 ) {
-#       my $response_code = $curl->getinfo(CURLINFO_HTTP_CODE);
-#       if($response_code == 200) {
-#           $response = decode_json($response_body);
-#           use Data::Dumper;
-#           $logger->info(Dumper($response));
-#       } else {
-#           $logger->error("An error occured while processing the JSON request return code ($response_code)");
-#           $logger->error(Dumper($response_body));
-#           die "An error occured while processing the JSON request return code ($response_code)";
-#       }
-#   } else {
-#       my $msg = "An error occured while sending a JSON request: $curl_return_code ".$curl->strerror($curl_return_code)." ".$curl->errbuf;
-#       $logger->error($msg);
-#       die $msg;
-#   }
-#
-#   
-#    
-#}
 
 =head1 AUTHOR
 
