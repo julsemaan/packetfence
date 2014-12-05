@@ -287,6 +287,9 @@ sub sdn_authorize {
         elsif($switch->{_IsolationStrategy} eq "DNS"){
             $switch->install_dns_redirect($port, $mac, $switch_id) || return { action => "failed" };
         }
+        elsif($switch->{_IsolationStrategy} eq "WEB"){
+            $switch->install_web_redirect($port, $mac, $switch_id) || return { action => "failed" };
+        }
         return { action => "isolate", strategy => $switch->{_IsolationStrategy} };
     } 
     else{
@@ -295,6 +298,9 @@ sub sdn_authorize {
         }
         elsif($switch->{_IsolationStrategy} eq "DNS"){
             $switch->uninstall_dns_redirect($port, $mac) || return {action => "failed"};
+        }
+        elsif($switch->{_IsolationStrategy} eq "WEB"){
+            $switch->uninstall_web_redirect($port, $mac) || return {action => "failed"};
         }
         return { action => "accept", strategy => $switch->{_IsolationStrategy} , role => $role } ;
     }

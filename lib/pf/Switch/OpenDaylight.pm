@@ -76,6 +76,18 @@ sub get_flow_name{
     elsif($type eq "dnsredirect-out"){
         return "dnsredirect-out-".$clean_mac;
     }
+    elsif($type eq "webredirect-in"){
+        return "webredirect-in-".$clean_mac;
+    }
+    elsif($type eq "webredirect-out"){
+        return "webredirect-out-".$clean_mac;
+    }
+    elsif($type eq "webredirect-whitelist-in"){
+        return "webredirect-whitelist-in-".$clean_mac;
+    }
+    elsif($type eq "webredirect-whitelist-out"){
+        return "webredirect-whitelist-out-".$clean_mac;
+    }
     else{
         $logger->error("Invalid type sent. Returning something that should work.");
         return $type.$clean_mac;
@@ -220,6 +232,7 @@ sub handleReAssignVlanTrapForWiredMacAuth {
     my $vlan_obj = new pf::vlan::custom();    
     my $info = pf::node::node_view($mac);
     my $violation_count = pf::violation::violation_count_trap($mac);
+    my $device_ok = (!defined($info) || $violation_count > 0 || $info->{status} eq $pf::node::STATUS_UNREGISTERED || $info->{status} eq $pf::node::STATUS_PENDING);
 
     if($self->{_IsolationStrategy} eq "VLAN"){
         my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $self, $ifIndex, undef, undef, undef);
@@ -227,12 +240,20 @@ sub handleReAssignVlanTrapForWiredMacAuth {
         $self->authorizeMac($mac, $vlan, $ifIndex);
     }
     elsif($self->{_IsolationStrategy} eq "DNS"){
-        if (!defined($info) || $violation_count > 0 || $info->{status} eq $pf::node::STATUS_UNREGISTERED || $info->{status} eq $pf::node::STATUS_PENDING){
+        if ($device_ok){
             $self->reactivate_dns_redirect($ifIndex, $mac);
         }
         else{
             $self->uninstall_dns_redirect($ifIndex, $mac);
         }
+    }
+    elsif($self->{_IsolationStrategy} eq "WEB"){
+        if ($device_ok){
+            $self->reactivate_web_redirect($ifIndex, $mac);
+        }
+        else{
+            $self->uninstall_web_redirect($ifIndex, $mac);
+        }       
     }
 }
 
@@ -264,6 +285,152 @@ sub block_network_detection {
     );
     return $self->send_json_request($path, \%data, "PUT");
 
+}
+
+sub install_web_whitelist {
+    my ($self, $ifIndex, $mac, $switch_id) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    
+    my $flow_name = $self->get_flow_name("webredirect-whitelist-out", $mac);
+    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
+    $logger->info("Computed path is : $path");
+
+    my %data = (
+        "name" => $flow_name,
+        "node" => {
+            "id" => $switch_id,
+            "type" => "OF",
+        },
+        #"ingressPort" => "$ifIndex",
+        "dlSrc" => $mac,
+        "priority" => "1001",
+        "etherType" => "0x800",
+        "nwDst" => "172.20.20.109",
+        #"nwDst" => "0.0.0.0/0",
+        "tpDst" => "80",
+        "protocol" => "tcp",
+        "installInHw" => "true",
+        "actions" => [
+            "OUTPUT=1"
+        ]
+    );
+    my $success_out = $self->send_json_request($path, \%data, "PUT");
+
+    $flow_name = $self->get_flow_name("webredirect-whitelist-in", $mac);
+    $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
+    $logger->info("Computed path is : $path");
+
+    %data = (
+        "name" => $flow_name,
+        "node" => {
+            "id" => $switch_id,
+            "type" => "OF",
+        },
+        #"ingressPort" => "$ifIndex",
+        "dlDst" => $mac,
+        "priority" => "1001",
+        "etherType" => "0x800",
+        "nwSrc" => "172.20.20.109",
+        #"nwDst" => "0.0.0.0/0",
+        "tpSrc" => "80",
+        "protocol" => "tcp",
+        "installInHw" => "true",
+        "actions" => [
+            "OUTPUT=$ifIndex"
+        ]
+    );
+    my $success_in = $self->send_json_request($path, \%data, "PUT");
+    
+    return $success_out && $success_in;
+
+}
+
+sub install_web_redirect {
+    my ($self, $ifIndex, $mac, $switch_id) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    
+    if ( $self->reactivate_web_redirect($ifIndex, $mac) ){
+        $logger->warn("Couldn't reactivate webredirect. Installing a new one");
+        return $TRUE;
+    }
+
+    if (! $self->install_web_whitelist($ifIndex, $mac, $switch_id) ){
+        return $FALSE;
+    }
+
+    my $flow_name = $self->get_flow_name("webredirect-out", $mac);
+    my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
+    $logger->info("Computed path is : $path");
+
+    my %data = (
+        "name" => $flow_name,
+        "node" => {
+            "id" => $switch_id,
+            "type" => "OF",
+        },
+        #"ingressPort" => "$ifIndex",
+        "dlSrc" => $mac,
+        "priority" => "1000",
+        "etherType" => "0x800",
+        #"nwDst" => "0.0.0.0/0",
+        "tpDst" => "80",
+        "protocol" => "tcp",
+        "installInHw" => "true",
+        "actions" => [
+            "CONTROLLER"
+        ]
+    );
+    my $success_out = $self->send_json_request($path, \%data, "PUT");
+
+    $flow_name = $self->get_flow_name("webredirect-in", $mac);
+    $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow_name";
+    $logger->info("Computed path is : $path");
+
+    %data = (
+        "name" => $flow_name,
+        "node" => {
+            "id" => $switch_id,
+            "type" => "OF",
+        },
+        #"ingressPort" => "$ifIndex",
+        "dlDst" => $mac,
+        "priority" => "1000",
+        "etherType" => "0x800",
+        #"nwDst" => "0.0.0.0/0",
+        "tpSrc" => "80",
+        "protocol" => "tcp",
+        "installInHw" => "true",
+        "actions" => [
+            "CONTROLLER"
+        ]
+    );
+    my $success_in = $self->send_json_request($path, \%data, "PUT");
+    
+    return $success_out && $success_in;
+
+}
+
+sub uninstall_web_redirect {
+    my ($self, $ifIndex, $mac) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+
+    #$self->find_and_delete_flow("dnsredirect", $mac);
+    my $flow_name = $self->get_flow_name("webredirect-out", $mac);
+    $self->deactivate_flow($flow_name); 
+    $flow_name = $self->get_flow_name("webredirect-in", $mac);
+    $self->deactivate_flow($flow_name); 
+
+    return $TRUE;
+}
+
+sub reactivate_web_redirect {
+    my ($self, $ifIndex, $mac) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    my $flow_name = $self->get_flow_name("webredirect-out", $mac);
+    my $success_out = $self->reactivate_flow($flow_name); 
+    $flow_name = $self->get_flow_name("webredirect-in", $mac);
+    my $success_in = $self->reactivate_flow($flow_name); 
+    return $success_in && $success_out;
 }
 
 sub install_dns_redirect {
