@@ -271,9 +271,13 @@ sub sdn_authorize {
         $logger->info("Authorizing $mac on switch $switch_id port $port.");
     }
 
-    $switch->synchronize_locationlog($port, "0", $mac,
+    #$switch->synchronize_locationlog($port, "0", $mac,
+    #    $FALSE, $WIRED_MAC_AUTH, $mac, ""
+    #);
+    pf::locationlog::locationlog_synchronize($controller, $controller, $switch_id, $port, undef, $mac,
         $FALSE, $WIRED_MAC_AUTH, $mac, ""
     );
+
 
     my $info = pf::node::node_view($mac);
     my $violation_count = pf::violation::violation_count_trap($mac);
@@ -286,6 +290,7 @@ sub sdn_authorize {
         }
         else{
             $switch->isolate_device($port, $mac, $switch_id) || return { action => "failed" };
+            $switch->uninstall_additionnal_flows($port, $mac);
         }
         return { action => "isolate", strategy => $switch->getIsolationStrategy };
     } 
@@ -295,6 +300,8 @@ sub sdn_authorize {
         }
         else{
             $switch->release_device($port, $mac) || return {action => "failed"};
+            $switch->uninstall_additionnal_flows($port, $mac);
+            $switch->install_additionnal_flows($port, $mac, $switch_id, $info->{category});
         }
         return { action => "accept", strategy => $switch->getIsolationStrategy , role => $role } ;
     }

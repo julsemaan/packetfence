@@ -483,6 +483,11 @@ httpd_webservices=enabled
 # Should httpd.aaa be started?
 httpd_aaa=enabled
 #
+# services.httpd_sdnportal
+#
+# Should httpd.sdnportal be started?
+httpd_sdnportal=enabled
+#
 # services.httpd_proxy
 #
 # Should httpd.proxy be started?

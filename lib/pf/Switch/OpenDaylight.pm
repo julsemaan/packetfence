@@ -34,12 +34,12 @@ sub getIfType{ return $SNMP::ETHERNET_CSMACD; }
 sub getIsolationStrategy {return "VLAN"}
 
 sub release_device {
-    my ($self, $ifIndex, $mac) = @_;
+    my ($self, $ifIndex, $mac, $switch_id) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
     $logger->warn("Not implemented");
 }
 sub reisolate_device {
-    my ($self, $ifIndex, $mac) = @_;
+    my ($self, $ifIndex, $mac, $switch_id) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
     $logger->warn("Not implemented");
 }
@@ -49,6 +49,36 @@ sub isolate_device {
     $logger->warn("Not implemented");
 }
 
+sub install_additionnal_flows {
+    my ($self, $ifIndex, $mac, $switch_id, $role) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    my $success = 1;
+    foreach my $json_flow (@{$self->{"_flows"}->{$role}}){
+        $logger->info($json_flow);
+        my $flow = decode_json($json_flow);
+        $flow->{name} = $self->get_flow_name("additionnal-".$flow->{name}, $mac);
+        $flow->{node} = {"id" => $switch_id, "type" => "OF"};
+        $flow->{installInHw} = "true";
+        $flow->{dlSrc} = $mac;
+        my $path = "controller/nb/v2/flowprogrammer/default/node/OF/$switch_id/staticFlow/$flow->{name}";
+        $success = 0 unless $self->send_json_request($path, $flow, "PUT");
+    }
+
+    return $success;
+
+}
+
+sub uninstall_additionnal_flows {
+    my ($self, $ifIndex, $mac) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    my $clean_mac = $mac;
+    $clean_mac =~ s/://g;
+    $logger->info("Finding flows matching : "."additionnal-.*-".$clean_mac);
+    my @flows = $self->find_flows_by_name("additionnal-.*-".$clean_mac);
+    foreach my $flow (@flows){
+        $self->send_json_request("controller/nb/v2/flowprogrammer/default/node/OF/$flow->{node}->{id}/staticFlow/$flow->{name}", {}, "DELETE") if $flow;
+    }
+}
 
 sub authorizeMac {
     my ($self, $mac, $vlan, $port, $switch_id) = @_;
@@ -220,6 +250,8 @@ sub handleReAssignVlanTrapForWiredMacAuth {
     my $violation_count = pf::violation::violation_count_trap($mac);
     my $device_not_ok = (!defined($info) || $violation_count > 0 || $info->{status} eq $pf::node::STATUS_UNREGISTERED || $info->{status} eq $pf::node::STATUS_PENDING);
 
+    my $locationlog = pf::locationlog::locationlog_view_open_mac($mac);
+
     if($self->{_IsolationStrategy} eq "VLAN"){
         my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $self, $ifIndex, undef, undef, undef);
         $self->deauthorizeMac($mac, $vlan, $ifIndex);
@@ -227,10 +259,13 @@ sub handleReAssignVlanTrapForWiredMacAuth {
     }
     else{
         if ($device_not_ok){
-            $self->reisolate_device($ifIndex, $mac);
+            $self->reisolate_device($ifIndex, $mac, $locationlog->{switch_mac});
+            $self->uninstall_additionnal_flows($ifIndex, $mac);
         }
         else{
-            $self->release_device($ifIndex, $mac);
+            $self->release_device($ifIndex, $mac, $locationlog->{switch_mac});
+            $self->uninstall_additionnal_flows($ifIndex, $mac);
+            $self->install_additionnal_flows($ifIndex, $mac, $locationlog->{switch_mac}, $info->{category});
         }
     }
 }
@@ -342,6 +377,26 @@ sub find_flow_by_name {
 
     return $FALSE;
 
+}
+
+sub find_flows_by_name {
+    my ($self, $name) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($self) );
+    my $path = "controller/nb/v2/flowprogrammer/default";
+    my %data = ();
+    my $json_response = $self->send_json_request( $path, \%data, "GET" );
+    my $data = decode_json($json_response);
+
+    my @found_flows;
+    my $flows = $data->{flowConfig};
+    foreach my $flow (@$flows){
+        if($flow->{name} =~ /$name/){
+            $logger->info("Found flow matching $name $flow->{name}");
+             push @found_flows, $flow;
+        }
+    }
+
+    return @found_flows;
 }
 
 sub find_and_delete_flow {

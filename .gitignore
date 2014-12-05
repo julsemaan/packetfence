@@ -87,3 +87,6 @@ logs/
 var/
 raddb/sites-enabled/
 addons/opendaylight/target/classes/
+
+#tmp for sdn portal that's homed in html/sdn-portal
+html/sdn-portal/logs
