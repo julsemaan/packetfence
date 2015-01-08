@@ -72,6 +72,8 @@ our (
     %CAPTIVE_PORTAL,
 #realm.conf
     %ConfigRealm, $cached_realm,
+#domain.conf
+    %ConfigDomain, $cached_domain,
 );
 
 BEGIN {
@@ -121,6 +123,7 @@ BEGIN {
         $OS
         %Doc_Config
         %ConfigRealm $cached_realm
+        %ConfigDomain $cached_domain
     );
 }
 
@@ -421,6 +424,7 @@ sub init_config {
     readFloatingNetworkDeviceFile();
     readFirewallSSOFile();
     readRealmFile();
+    readDomainFile();
 }
 
 =item ipset_version -  check the ipset version on the system
@@ -797,6 +801,24 @@ sub readRealmFile {
         -onreload => [ reload_realm_config => sub {
             my ($config) = @_;
             $config->toHash(\%ConfigRealm);
+        }]
+    );
+    if(@Config::IniFiles::errors) {
+        $logger->logcroak( join( "\n", @Config::IniFiles::errors ) );
+    }
+}
+
+=item readDomainFile - domain.conf
+
+=cut
+
+sub readDomainFile {
+    $cached_domain = pf::config::cached->new(
+        -file => $domain_config_file,
+        -allowempty => 1,
+        -onreload => [ reload_domain_config => sub {
+            my ($config) = @_;
+            $config->toHash(\%ConfigDomain);
         }]
     );
     if(@Config::IniFiles::errors) {
