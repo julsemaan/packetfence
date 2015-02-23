@@ -81,6 +81,7 @@ use constant {
 use lib INSTALL_DIR . "/lib";
 
 use pf::log;
+use pf::constants;
 use pf::config;
 use pf::config::ui;
 use pf::pfcmd;
@@ -2493,6 +2494,9 @@ sub configreload {
     require pf::vlan::filter;
     pf::config::cached::updateCacheControl();
     pf::config::cached::ReloadConfigs($force);
+    require pfconfig::manager;
+    my $manager = pfconfig::manager->new;
+    $manager->expire_all;
     return 0;
 }
 
