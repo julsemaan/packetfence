@@ -126,6 +126,66 @@ sub getMinOSVersion {
     return '12.1(22)EA10';
 }
 
+#CUSTOM
+#TODO (put it back on macDetectionVlan but since it's not PF default behavior to do it on mac change i didn't do it)
+sub resetPortSecurity {
+    my ($this) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($this) );
+    
+    # This is all the interfaces managed by PF 
+    my @managed_ifs = $this->getManagedIfIndexes();
+        
+    foreach my $ifindex (@managed_ifs){
+        # check if it's port-sec enabled
+        $logger->info("Evaluating if $ifindex is port-security enabled");
+        if ( $this->isStaticPortSecurityEnabled($ifindex) ){
+            $logger->info("Will reset : " . $ifindex . " on " . $this->{_ip} . " if it's necesary because it's port-security enabled.");
+            
+            # put the port down so we can work
+            $this->setAdminStatus( $ifindex, $SNMP::DOWN );
+            
+            my $sec_mac_add_hash = $this->getSecureMacAddresses($ifindex);
+            # circle through each secure mac on the port
+            foreach my $mac_vl_hash ($sec_mac_add_hash) {
+                foreach my $mac (keys %{$mac_vl_hash}){
+                    # the vlan where it is currently
+                    my $vl = $mac_vl_hash->{$mac}[0];
+                    # if this is the voice vlan
+                    if($vl eq $this->getVoiceVlan($ifindex)){
+                        my $fake_mac = $this->generateFakeMac( 1, $ifindex );
+                        # we don't want to work for nothing
+                        if( $mac ne $fake_mac ){
+                            $logger->info("RESETTING VOICE MAC on VLAN ". $vl ." on port $ifindex on switch " . $this->{_ip} . " with MAC : " . $fake_mac);
+                            $this->authorizeMAC($ifindex, $mac, $fake_mac, $vl, $vl);
+                        }
+                        else{
+                            $logger->info("Will not reset the VOICE mac on " . $ifindex . " on " . $this->{_ip} . " since it's useless");
+                        }
+                    }
+                    # this is data
+                    else{
+                        my $fake_mac = $this->generateFakeMac( 0, $ifindex );
+                        # still don't want to work for nothing
+                        if( $mac ne $fake_mac ){
+                            $logger->info("RESETTING ACCESS MAC on VLAN ". $vl ." on port $ifindex on switch " . $this->{_ip} . " with MAC : " . $fake_mac);
+                            $this->authorizeMAC($ifindex, $mac, $fake_mac, $vl, $vl);
+                        }
+                        else{
+                            $logger->info("Will not reset the ACCESS MAC on " . $ifindex . " on " . $this->{_ip} . " since it's useless");
+                        }
+                    }
+                }
+            }
+            
+            #up
+            $this->setAdminStatus( $ifindex, $SNMP::UP );
+        }
+    }
+    return $TRUE;
+}
+
+
+
 sub getManagedPorts {
     my $this       = shift;
     my $logger     = Log::Log4perl::get_logger( ref($this) );
