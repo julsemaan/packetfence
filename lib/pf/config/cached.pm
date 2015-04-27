@@ -393,9 +393,13 @@ sub RewriteConfig {
     my ($self) = @_;
     my $logger = get_logger();
     my $file = $self->GetFileName;
-    if( $self->HasChanged(1) ) {
-        die "Config $file was modified from last loading\n";
-    }
+#
+#   This is commented because it is currently causing issues with syncing
+#   So either this will be reworked in v5.1 or completely removed
+#   if( $self->HasChanged(1) ) {
+#       die "Config $file was modified from last loading manually verify file and run pfcmd configreload\n";
+#   }
+
     my $result;
     umask 2;
     my $lock = lockFileForWriting($file);
@@ -717,7 +721,7 @@ Swap the data with cached data
 
 sub _swap_data {
     my ($self,$new_self) = @_;
-    Data::Swap::swap($self,$new_self); 
+    Data::Swap::swap($self,$new_self);
     $self->addToLoadedConfigs();
     #Unbless the old data to avoid DESTROY from being called
     unbless($new_self);
@@ -1102,7 +1106,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

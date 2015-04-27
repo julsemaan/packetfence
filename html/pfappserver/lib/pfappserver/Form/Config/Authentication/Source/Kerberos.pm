@@ -12,6 +12,7 @@ Form definition to create or update a Kerberos user source.
 
 use HTML::FormHandler::Moose;
 extends 'pfappserver::Form::Config::Authentication::Source';
+with 'pfappserver::Base::Form::Role::Help';
 
 # Form fields
 has_field 'host' =>
@@ -28,10 +29,20 @@ has_field 'realm' =>
    label => 'Realm',
    required => 1,
   );
+has_field 'stripped_user_name' =>
+  (
+   type            => 'Toggle',
+   checkbox_value  => 'yes',
+   unchecked_value => 'no',
+   default         => 'yes',
+   label           => 'Use stripped username ',
+   tags => { after_element => \&help,
+             help => 'Use stripped username returned by RADIUS to test the following rules.' },
+  );
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

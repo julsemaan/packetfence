@@ -86,8 +86,8 @@ sub _setup_object {
 =cut
 
 sub object {
-    my ($self,$c,$id) = @_;
-    $self->_setup_object($c,$id);
+    my ($self,$c,@args) = @_;
+    $self->_setup_object($c,@args);
 }
 
 =head2 update
@@ -213,7 +213,7 @@ sub list :Local :Args(0) {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

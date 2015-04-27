@@ -83,6 +83,15 @@ The xml parser
 
 has xmlParser => (is => 'rw', lazy => 1, builder => 1);
 
+=head2 agent_download_uri 
+
+The URI to download the agent
+
+=cut
+
+has agent_download_uri => (is => 'rw');
+
+
 =head2 _build_xmlParser
 
 _build_xmlParser
@@ -169,11 +178,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

@@ -17,8 +17,6 @@ use strict;
 use warnings;
 
 use Log::Log4perl;
-use threads;
-use threads::shared;
 use pf::log;
 
 use base ('pf::vlan');
@@ -79,7 +77,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

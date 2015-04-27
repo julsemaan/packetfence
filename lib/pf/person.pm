@@ -106,7 +106,7 @@ sub person_db_prepare {
                    nc.name as 'category'
             FROM person p
             LEFT JOIN node n ON p.pid = n.pid
-            LEFT JOIN temporary_password t ON p.pid = t.pid
+            LEFT JOIN password t ON p.pid = t.pid
             LEFT JOIN node_category nc ON nc.category_id = t.category
             WHERE p.pid = ? ]);
 
@@ -124,7 +124,7 @@ sub person_db_prepare {
                    t.category as 'category'
             FROM person p
             LEFT JOIN node n ON p.pid = n.pid
-            LEFT JOIN temporary_password t ON p.pid = t.pid
+            LEFT JOIN password t ON p.pid = t.pid
             GROUP BY pid ];
 
     $person_statements->{'person_count_all_sql'} = qq[ SELECT count(*) as nb FROM person ];
@@ -141,12 +141,8 @@ sub person_db_prepare {
             WHERE pid=? ]);
 
     $person_statements->{'person_nodes_sql'} = get_db_handle()->prepare(
-        qq[ SELECT mac, pid, regdate, unregdate, lastskip, status, user_agent, computername,
-                   IFNULL(os_class.description, ' ') as dhcp_fingerprint
+        qq[ SELECT mac, pid, regdate, unregdate, lastskip, status, user_agent, computername, device_class AS dhcp_fingerprint
             FROM node
-            LEFT JOIN dhcp_fingerprint ON node.dhcp_fingerprint = dhcp_fingerprint.fingerprint
-            LEFT JOIN os_mapping ON dhcp_fingerprint.os_id = os_mapping.os_type
-            LEFT JOIN os_class ON os_mapping.os_class = os_class.class_id
             WHERE pid = ? ]);
 
     $person_statements->{'person_violations_sql'} = get_db_handle()->prepare(
@@ -178,7 +174,7 @@ sub person_delete {
     my ($pid) = @_;
 
     my $logger = Log::Log4perl::get_logger('pf::person');
-    return (0) if ( $pid eq "admin" );
+    return (0) if ( $pid eq "admin" || $pid eq "default" );
 
     if ( !person_exist($pid) ) {
         $logger->error("delete of non-existent person '$pid' failed");
@@ -339,7 +335,7 @@ sub person_modify {
     }
 
     db_query_execute(PERSON, $person_statements, 'person_modify_sql', @{$existing}{@FIELDS}, $pid) || return (0);
-    $logger->info("person $pid modified to $new_pid");
+    $logger->info("person $pid modified to $new_pid") if ($pid ne $new_pid);
     return (1);
 }
 
@@ -363,7 +359,7 @@ Minor parts of this file may have been contributed. See CREDITS.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 Copyright (C) 2005 Kevin Amorin
 

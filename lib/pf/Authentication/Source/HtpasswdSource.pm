@@ -8,9 +8,10 @@ pf::Authentication::Source::HtpasswdSource
 
 =cut
 
-use pf::config qw($TRUE $FALSE);
+use pf::constants qw($TRUE $FALSE);
 use pf::Authentication::constants;
 use pf::Authentication::Source;
+use pf::util;
 
 use Apache::Htpasswd;
 
@@ -19,6 +20,7 @@ extends 'pf::Authentication::Source';
 
 has '+type' => (default => 'Htpasswd');
 has 'path' => (isa => 'Str', is => 'rw', required => 1);
+has 'stripped_user_name' => (isa => 'Str', is => 'rw', default => 'yes');
 
 =head1 METHODS
 
@@ -68,6 +70,7 @@ sub match_in_subclass {
     my ($self, $params, $rule, $own_conditions, $matching_conditions) = @_;
     local $_;
 
+    $params->{'username'} = $params->{'stripped_user_name'} if (defined($params->{'stripped_user_name'} ) && $params->{'stripped_user_name'} ne '' && isenabled($self->{'stripped_user_name'}));
     # First check if the username is found in the htpasswd file
     my $username = $params->{'username'} || $params->{'email'};
     my $password_file = $self->{'path'};
@@ -97,7 +100,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

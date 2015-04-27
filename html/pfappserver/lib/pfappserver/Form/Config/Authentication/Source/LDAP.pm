@@ -92,6 +92,27 @@ has_field 'password' =>
    label => 'Password',
    password => 0,
   );
+has_field 'stripped_user_name' =>
+  (
+   type            => 'Toggle',
+   checkbox_value  => 'yes',
+   unchecked_value => 'no',
+   default         => 'yes',
+   label           => 'Use stripped username ',
+   tags => { after_element => \&help,
+             help => 'Use stripped username returned by RADIUS to test the following rules.' },
+  );
+
+has_field 'cache_match',
+  (
+   type => 'Toggle',
+   label => 'Cache match',
+   checkbox_value => '1',
+   unchecked_value => '0',
+   default => 0,
+   tags => { after_element => \&help,
+             help => 'Will cache results of matching a rule' },
+  );
 
 =head2 validate
 
@@ -113,7 +134,7 @@ sub validate {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

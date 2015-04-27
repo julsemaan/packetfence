@@ -49,14 +49,20 @@ has_field 'api_uri' =>
    type => 'Text',
   );
 
+has_field 'agent_download_uri' =>
+  (
+   type => 'Text',
+   required => 1,
+  );
+
 has_block definition =>
   (
-   render_list => [ qw(id type description category username password host port protocol api_uri oses) ],
+   render_list => [ qw(id type description category username password host port protocol api_uri oses agent_download_uri) ],
   );
 
 =head1 COPYRIGHT
 
-Copyright (C) 2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

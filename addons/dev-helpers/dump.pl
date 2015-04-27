@@ -121,7 +121,7 @@ sub parseArgs {
 sub _run {
     my ($self) = @_;
     require pf::SwitchFactory;
-    print Data::Dumper::Dumper(pf::SwitchFactory->getInstance->instantiate($self->args));
+    print Data::Dumper::Dumper(pf::SwitchFactory->instantiate($self->args));
 }
 
 package pf::dump::switches;
@@ -175,7 +175,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

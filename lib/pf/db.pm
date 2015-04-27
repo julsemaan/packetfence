@@ -23,6 +23,7 @@ use DBI;
 use File::Basename;
 use pf::log;
 use pf::config;
+use pfconfig::cached_hash;
 
 # Constants
 use constant MAX_RETRIES  => 3;
@@ -38,7 +39,7 @@ BEGIN {
     use Exporter ();
     our ( @ISA, @EXPORT );
     @ISA    = qw(Exporter);
-    @EXPORT = qw(db_data db_connect db_disconnect get_db_handle db_query_execute db_ping db_cancel_current_query);
+    @EXPORT = qw(db_data db_connect db_disconnect get_db_handle db_query_execute db_ping db_cancel_current_query db_now);
 
 }
 
@@ -54,16 +55,7 @@ END {
     $DBH = undef;
 }
 
-$DB_Config = $Config{'database'};
-#Adding a config reload callback that will disconnect the database when a change in the db configuration has been found
-$cached_pf_config->addPostReloadCallbacks( 'reload_db_config' => sub {
-    my $new_db_config = $Config{'database'};
-    if (grep { $DB_Config->{$_} ne $new_db_config->{$_}  } qw(host port user pass db) ) {
-        db_disconnect();
-    }
-    $DB_Config = $new_db_config;
-});
-
+tie %$DB_Config, 'pfconfig::cached_hash', 'resource::Database';
 
 =head1 SUBROUTINES
 
@@ -332,6 +324,24 @@ sub db_query_execute {
     }
 }
 
+our $PREPARED_NOW_STMT;
+
+=item db_now
+
+Get the current timestamp of the mysql query
+
+=cut
+
+sub db_now {
+    my $dbh = get_db_handle();
+    $PREPARED_NOW_STMT = $dbh->prepare("SELECT NOW();") unless $PREPARED_NOW_STMT;
+    return unless $PREPARED_NOW_STMT->execute();
+    my $row = $PREPARED_NOW_STMT->fetch;
+    $PREPARED_NOW_STMT->finish;
+    return unless $row;
+    return $row->[0];
+}
+
 =item * db_cancel_current_query
 
 Cancels the current query
@@ -356,7 +366,7 @@ Minor parts of this file may have been contributed. See CREDITS.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 Copyright (C) 2005 Kevin Amorin
 

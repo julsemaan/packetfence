@@ -30,6 +30,7 @@ use Try::Tiny;
 
 use base ('pf::Switch::Cisco::Catalyst_2960');
 
+use pf::constants;
 use pf::config;
 use pf::Switch::constants;
 use pf::util;
@@ -40,6 +41,7 @@ use pf::util::radius qw(perform_coa perform_disconnect);
 use pf::node qw(node_attributes node_view);
 use pf::web::util;
 use pf::violation qw(violation_count_trap);
+use pf::locationlog;
 
 sub description { 'Cisco Catalyst 2960 with Web Auth' }
 
@@ -145,6 +147,7 @@ sub returnRadiusAccessAccept {
                 $session_id{client_mac} = $mac;
                 $session_id{wlan} = $ssid;
                 $session_id{switch_id} = $this->{_id};
+                pf::locationlog::locationlog_set_session($mac, $session_id{_session_id});
                 $radius_reply_ref = {
                     'User-Name' => $mac,
                     'Cisco-AVPair' => ["url-redirect-acl=$role","url-redirect=".$this->{'_portalURL'}."/cep$session_id{_session_id}"],
@@ -292,7 +295,7 @@ Redefinition of pf::Switch::parseRequest due to specific attribute being used fo
 sub parseRequest {
     my ( $this, $radius_request ) = @_;
     my $client_mac      = clean_mac($radius_request->{'Calling-Station-Id'});
-    my $user_name       = $radius_request->{'User-Name'};
+    my $user_name       = $radius_request->{'TLS-Client-Cert-Common-Name'} || $radius_request->{'User-Name'};
     my $nas_port_type   = $radius_request->{'NAS-Port-Type'};
     my $port            = $radius_request->{'NAS-Port'};
     my $eap_type        = ( exists($radius_request->{'EAP-Type'}) ? $radius_request->{'EAP-Type'} : 0 );
@@ -314,7 +317,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

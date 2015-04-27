@@ -91,6 +91,7 @@ sub scan_status : Private {
 
     $c->stash(
         template    => 'scan-in-progress.html',
+        timer         => $Config{'trapping'}{'redirtimer'},
         txt_message => i18n_format(
             'scan in progress contact support if too long',
             $scan_start_time
@@ -131,7 +132,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -16,6 +16,7 @@ use warnings;
 
 use Log::Log4perl;
 
+use pf::constants;
 use pf::config;
 use pf::node qw(node_attributes);
 use pf::violation qw(violation_count_trap);
@@ -153,7 +154,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

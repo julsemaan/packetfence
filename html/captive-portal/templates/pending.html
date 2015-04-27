@@ -2,6 +2,7 @@
 [% INCLUDE header.html %]
 <script type="text/javascript">
 var txt_ie = "[% i18n("Some versions of Internet Explorer may take a while before redirection occur.") | html %]";
+var txt_web_notification = "[% i18n("Network access has been granted") %]"
 // once the page is loaded
 document.observe("dom:loaded", function() {
 
@@ -11,7 +12,7 @@ document.observe("dom:loaded", function() {
   }
 
   detectNetworkAccess.delay([% initial_delay %], 
-    [% retry_delay %], "[% destination_url %]", "[% external_ip %]"
+    [% retry_delay %], "[% destination_url %]", "[% external_ip %]", "[% image_path %]"
   );
 });
 </script>

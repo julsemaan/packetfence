@@ -42,23 +42,26 @@ sub parseArgs {
             my $base = ref($self) || $self;
             $module = "${base}::${action}";
         }
+        $module =~ /^(.*)$/;
+        $module = $1;
         eval {
             load $module unless is_loaded($module);
             $cmd = $module;
         };
         if($@) {
             if ($@ =~ /Compilation failed/) {
-                $self->{help_msg} = "module $module cannot be loaded";
+                $self->{help_msg} = "module $module cannot be loaded\n$@\n";
             } else {
-                $self->{help_msg} = "unknown command $action";
+                $self->{help_msg} = "unknown command $action\n$@\n";
             }
             $cmd = $self->unknownActionCmd;
+        } else {
+            $self->{subcmd_args} = \@args;
         }
     } else {
         $cmd = $self->noActionCmd;
     }
     $self->{subcmd} = $cmd;
-    $self->{subcmd_args} = \@args;
     return 1;
 }
 
@@ -95,11 +98,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

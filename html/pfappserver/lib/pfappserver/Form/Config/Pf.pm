@@ -14,6 +14,8 @@ use HTML::FormHandler::Moose;
 extends 'pfappserver::Base::Form';
 with 'pfappserver::Base::Form::Role::Help';
 use pf::config;
+use pf::IniFiles;
+use pf::file_paths;
 
 has 'section' => ( is => 'ro' );
 
@@ -29,7 +31,8 @@ sub field_list {
 
     my $list = [];
     my $section = $self->section;
-    my @section_fields = $cached_pf_default_config->Parameters($section);
+    my $default_pf_config = pf::IniFiles->new(-file => $default_config_file, -allowempty => 1);
+    my @section_fields = $default_pf_config->Parameters($section);
     foreach my $name (@section_fields) {
         my $doc_section_name = "$section.$name";
         my $doc_section = $Doc_Config{$doc_section_name};
@@ -162,7 +165,7 @@ sub field_list {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

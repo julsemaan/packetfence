@@ -50,6 +50,7 @@ BEGIN {
 }
 
 use pf::config;
+use pf::constants::trigger qw($TRIGGER_TYPE_ACCOUNTING);
 use pf::config::cached;
 use pf::db;
 use pf::trigger;
@@ -251,7 +252,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

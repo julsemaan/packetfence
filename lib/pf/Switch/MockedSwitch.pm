@@ -44,10 +44,12 @@ use Time::HiRes qw( usleep );
 
 use base ('pf::Switch');
 
+use pf::constants;
 use pf::config;
 # importing switch constants
 use pf::Switch::constants;
 use pf::util;
+use pf::config::util;
 
 # these are in microseconds (not milliseconds!) because of Time::HiRes's usleep
 # TODO benchmark more sensible values
@@ -96,6 +98,7 @@ sub supportsFloatingDevice { return $TRUE; }
 sub supportsSaveConfig { return $FALSE; }
 sub supportsCdp { return $TRUE; }
 sub supportsLldp { return $FALSE; }
+sub supportsRoamingAccounting { return $FALSE }
 # inline capabilities
 sub inlineCapabilities { return ($MAC,$PORT,$SSID); }
 
@@ -2928,7 +2931,7 @@ User-Name
 sub parseRequest {
     my ($this, $radius_request) = @_;
     my $client_mac = clean_mac($radius_request->{'Calling-Station-Id'});
-    my $user_name = $radius_request->{'User-Name'};
+    my $user_name       = $radius_request->{'TLS-Client-Cert-Common-Name'} || $radius_request->{'User-Name'};
     my $nas_port_type = $radius_request->{'NAS-Port-Type'};
     my $port = $radius_request->{'NAS-Port'};
     my $eap_type = 0;
@@ -2974,7 +2977,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -16,6 +16,7 @@ use Moo;
 use namespace::autoclean;
 use pf::config;
 use pf::util qw(isenabled);
+use pf::file_paths;
 
 extends 'pf::ConfigStore';
 
@@ -25,7 +26,9 @@ extends 'pf::ConfigStore';
 
 =cut
 
-sub _buildCachedConfig { $pf::config::cached_network_config }
+sub configFile { $network_config_file }
+
+sub pfconfigNamespace { 'config::Network' }
 
 =head2 getRoutedNetworks
 
@@ -156,7 +159,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -19,6 +19,7 @@ F<conf/switches.conf>
 use strict;
 use warnings;
 use Log::Log4perl;
+use pf::constants;
 use pf::config;
 use base ('pf::Switch::Dell');
 
@@ -39,7 +40,7 @@ sub getMinOSVersion {
     return '112';
 }
 
-=item getIfIndexByNasPortId
+=head2 getIfIndexByNasPortId
 
 Fetch the ifindex on the switch by NAS-Port-Id radius attribute
 
@@ -73,7 +74,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

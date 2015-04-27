@@ -8,7 +8,7 @@ pf::Authentication::Source::SMSSource
 
 =cut
 
-use pf::config qw($TRUE $FALSE);
+use pf::constants qw($TRUE $FALSE);
 use pf::Authentication::constants;
 
 use Log::Log4perl qw(get_logger);
@@ -80,7 +80,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

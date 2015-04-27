@@ -46,11 +46,13 @@ use pf::traplog;
 use pf::util;
 use pf::services::util;
 use pf::violation qw(violation_maintenance);
+use pf::ConfigStore::Provisioning;
+use pf::factory::provisioner;
 
 # initialization
 # --------------
 # assign process name (see #1464)
-our $PROGRAM_NAME = $0 = basename($0);
+our $PROGRAM_NAME = $0 = "pfmon";
 our @REGISTERED_TASKS;
 our $IS_CHILD = 0;
 our %CHILDREN;
@@ -114,7 +116,7 @@ my $pidfile = "${var_dir}/run/pfmon.pid";
 
 our $HAS_LOCK = 0;
 open(my $fh,">>$pidfile");
-flock($fh, LOCK_EX | LOCK_NB) or die "cannot lock $pidfile another pfmon is running\n";
+#flock($fh, LOCK_EX | LOCK_NB) or die "cannot lock $pidfile another pfmon is running\n";
 $HAS_LOCK = 1;
 
 our $running = 1;
@@ -123,9 +125,14 @@ our $running = 1;
 daemonize($PROGRAM_NAME) if ($daemonize);
 our $PARENT_PID = $$;
 
-registertasks();
-runtasks();
-waitforit();
+
+sub start {
+    registertasks();
+    runtasks();
+    waitforit();
+}
+
+start();
 cleanup();
 
 END {
@@ -148,15 +155,15 @@ exit(0);
 =cut
 
 sub registertasks  {
-    register_task(
-        'iplog cleanup','iplog_cleanup_interval',sub {
-            iplog_cleanup( $Config{'expire'}{'iplog'} )
-              if ( $Config{'expire'}{'iplog'} );
-        }
-    );
+#    register_task(
+#        'iplog cleanup','iplog_cleanup_interval',sub {
+#            pf::iplog::cleanup( $Config{'expire'}{'iplog'} ,$Config{maintenance}{iplog_cleanup_batch},$Config{maintenance}{iplog_cleanup_timeout})
+#              if ( $Config{'expire'}{'iplog'} );
+#        }
+#    );
     register_task(
         'locationlog cleanup','locationlog_cleanup_interval',sub {
-            locationlog_cleanup( $Config{'expire'}{'locationlog'} )
+            locationlog_cleanup( $Config{'expire'}{'locationlog'}, $Config{maintenance}{locationlog_cleanup_batch},$Config{maintenance}{locationlog_cleanup_timeout})
               if ( $Config{'expire'}{'locationlog'} );
         }
     );
@@ -173,15 +180,21 @@ sub registertasks  {
         }
     );
     register_task(
-        'Expire httpd.admin sessions','httpd_admin_cleanup_interval',sub {
+        'expire httpd.admin sessions','httpd_admin_cleanup_interval',sub {
             purge_cache('httpd.admin')
               if ( isenabled($Config{'expire'}{'httpd_admin'}) );
         }
     );
     register_task(
-        'Expire httpd.portal sessions','httpd_portal_cleanup_interval',sub {
+        'expire httpd.portal sessions','httpd_portal_cleanup_interval',sub {
             purge_cache('httpd.portal')
               if ( isenabled($Config{'expire'}{'httpd_portal'}) );
+        }
+    );
+    register_task(
+        'expire ldap_auth cache','ldap_auth_cache_cleanup_interval',sub {
+            purge_cache('ldap_auth')
+              if ( isenabled($Config{'expire'}{'ldap_auth'}) );
         }
     );
     register_task(
@@ -202,7 +215,12 @@ sub registertasks  {
         }
     );
     register_task(
-        'Account maintenance','acct_maintenance_interval',sub {
+        'provisioner polling enforcement','provisioning_compliance_poll_interval',sub {
+            provisioner_compliance_poll();
+        }
+    );
+    register_task(
+        'account maintenance','acct_maintenance_interval',sub {
             acct_maintenance();
         }
     );
@@ -259,10 +277,25 @@ sub purge_cache {
     my $cache = pf::CHI->new( namespace => $namespace );
     for my $key ($cache->get_keys) {
         if($cache->exists_and_is_expired($key)) {
-            #Add an eval in case of the value deleted before 
+            #Add an eval in case of the value deleted before
             eval {
                 $cache->remove($key);
             };
+        }
+    }
+}
+
+=head2 provisioner_compliance_poll
+
+Polls each provisioner to enforce compliance
+
+=cut
+
+sub provisioner_compliance_poll {
+    foreach my $id (@{pf::ConfigStore::Provisioning->new->readAllIds}) {
+        my $provisioner = pf::factory::provisioner->new($id);
+        if($provisioner->supportsPolling){
+            $provisioner->pollAndEnforce($Config{maintenance}{provisioning_compliance_poll_interval});
         }
     }
 }
@@ -422,6 +455,7 @@ sub usr1_sighandler {
    db_cancel_current_query();
 }
 
+
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>
@@ -430,7 +464,7 @@ Minor parts of this file may have been contributed. See CREDITS.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 Copyright (C) 2005 Kevin Amorin
 

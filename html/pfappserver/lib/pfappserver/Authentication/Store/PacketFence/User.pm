@@ -6,7 +6,8 @@ use base qw/Catalyst::Authentication::User Class::Accessor::Fast/;
 use strict;
 use warnings;
 
-use pf::config qw($TRUE $FALSE $WEB_ADMIN_ALL);
+use pf::constants;
+use pf::config qw($WEB_ADMIN_ALL);
 use pf::authentication;
 use pf::Authentication::constants;
 use pf::log;
@@ -74,7 +75,7 @@ sub AUTOLOAD {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

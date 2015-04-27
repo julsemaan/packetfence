@@ -19,8 +19,13 @@ use pf::file_paths;
 use pf::util;
 use HTTP::Status qw(:constants is_error is_success);
 use List::MoreUtils qw(part);
+use pfconfig::manager;
 
 extends qw(pf::ConfigStore Exporter);
+
+sub configFile {$switches_config_file}
+
+sub pfconfigNamespace {'config::Switch'}
 
 our ( $switches_cached_config, %SwitchConfig );
 our @EXPORT = qw(%SwitchConfig);
@@ -185,6 +190,13 @@ sub remove {
     return $self->SUPER::remove($id);
 }
 
+sub commit {
+    my ( $self ) = @_;
+    my ($result,$error) = $self->SUPER::commit();
+    pfconfig::manager->new->expire('config::Switch');
+    return ($result,$error);
+}
+
 before rewriteConfig => sub {
     my ($self) = @_;
     my $config = $self->cachedConfig;
@@ -206,7 +218,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

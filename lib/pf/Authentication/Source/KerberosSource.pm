@@ -8,7 +8,7 @@ pf::Authentication::Source::KerberosSource
 
 =cut
 
-use pf::config qw($TRUE $FALSE);
+use pf::constants qw($TRUE $FALSE);
 use pf::Authentication::constants;
 use pf::Authentication::Source;
 
@@ -20,6 +20,7 @@ extends 'pf::Authentication::Source';
 has '+type' => ( default => 'Kerberos' );
 has 'host' => (isa => 'Str', is => 'rw', required => 1);
 has 'realm' => (isa => 'Str', is => 'rw', required => 1);
+has 'stripped_user_name' => (isa => 'Str', is => 'rw', default => 'yes');
 
 sub available_attributes {
   my $self = shift;
@@ -56,6 +57,7 @@ sub authenticate_using_kerberos {
 sub match_in_subclass {
     my ($self, $params, $rule, $own_conditions, $matching_conditions) = @_;
 
+    $params->{'username'} = $params->{'stripped_user_name'} if (defined($params->{'stripped_user_name'} ) && $params->{'stripped_user_name'} ne '' && isenabled($self->{'stripped_user_name'}));
     return $params->{'username'};
 }
 
@@ -66,7 +68,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

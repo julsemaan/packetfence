@@ -56,7 +56,11 @@ sub validate {
     if (grep { $_ eq $self->value->{name} } @SNMP::ROLES) {
         $self->field('name')->add_error('This is a reserved name.');
     }
-    elsif ($self->{id} && $self->{id} ne $self->value->{name} || !$self->{id}) {
+    elsif ($self->{id} && $self->{id} ne $self->value->{name}) {
+        # Build a list of existing roles
+        $self->field('name')->add_error('Cannot rename a role name');
+    }
+    elsif ( !$self->{id}) {
         # Build a list of existing roles
         my ($status, $result) = $self->ctx->model('Roles')->list();
         if (is_success($status)) {
@@ -70,7 +74,7 @@ sub validate {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

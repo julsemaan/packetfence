@@ -15,6 +15,7 @@ use Moose;
 use namespace::autoclean;
 use Net::Netmask;
 
+use pf::constants;
 use pf::config;
 use pf::error qw(is_error is_success);
 use pf::util;
@@ -745,7 +746,7 @@ sub getEnforcement {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

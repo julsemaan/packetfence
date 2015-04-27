@@ -2,6 +2,7 @@ package pf::Connection;
 
 use Moose;
 
+use pf::constants;
 use pf::config;
 use pf::log;
 
@@ -109,7 +110,7 @@ sub identifyType {
     ( (defined($nas_port_type)) && (lc($nas_port_type) =~ /^wireless/) ) ? $this->transport("Wireless") : $this->transport("Wired");
 
     # Handling EAP connection
-    ( defined($eap_type) ) ? $this->isEAP($TRUE) : $this->isEAP($FALSE);
+    ( defined($eap_type) && ($eap_type ne 0) ) ? $this->isEAP($TRUE) : $this->isEAP($FALSE);
 
     # Handling mac authentication versus 802.1X connection
     # In most cases, when EAP is used we can assume we are dealing with 802.1X connection. Unfortunately, some vendors are doing
@@ -142,7 +143,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

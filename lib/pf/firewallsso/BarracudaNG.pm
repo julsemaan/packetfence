@@ -43,7 +43,7 @@ sub action {
         $username =  $node_info->{'last_dot1x_username'} if ( $ConfigFirewallSSO{$firewall_conf}->{'uid'} eq '802.1x');
         return 0 if ( $ConfigFirewallSSO{$firewall_conf}->{'uid'} eq '802.1x' && $node_info->{'last_dot1x_username'} eq '');
 
-        my @categories = split(/,/, $ConfigFirewallSSO{$firewall_conf}->{categories});
+        my @categories = @{$self->{categories}};
         if ( defined($node_info) &&
             (ref($node_info) eq 'HASH') &&
             $node_info->{'status'} eq $pf::node::STATUS_REGISTERED &&
@@ -65,7 +65,7 @@ sub action {
         $username = $node_info->{'last_dot1x_username'} if ( $ConfigFirewallSSO{$firewall_conf}->{'uid'} eq '802.1x');
         return 0 if ( $ConfigFirewallSSO{$firewall_conf}->{'uid'} eq '802.1x' && $node_info->{'last_dot1x_username'} eq '');
 
-        my @categories = split(/,/, $ConfigFirewallSSO{$firewall_conf}->{categories});
+        my @categories = @{$self->{categories}};
         if (defined($node_info) && (ref($node_info) eq 'HASH') &&
             $node_info->{'status'} eq $pf::node::STATUS_REGISTERED &&
             (grep $_ eq $node_info->{'category'}, @categories)
@@ -90,7 +90,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

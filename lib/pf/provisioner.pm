@@ -15,9 +15,18 @@ pf::provisioner
 use strict;
 use warnings;
 use Moo;
-use pf::os;
 use pf::config;
+use Readonly;
+use pf::log;
 use List::MoreUtils qw(any);
+
+=head1 Constants
+
+head2 COMMUNICATION_FAILED
+
+=cut
+
+Readonly::Scalar our $COMMUNICATION_FAILED => -1;
 
 =head1 Atrributes
 
@@ -85,6 +94,14 @@ If the provisioner has to be enforced on each connection
 
 has enforce => (is => 'rw', default => sub { 1 });
 
+=head2 non_compliance_violation
+
+Which violation should be raised when a device is not compliant
+
+=cut
+
+has non_compliance_violation => (is => 'rw' );
+
 =head1 METHODS
 
 =head2 _build_template
@@ -99,6 +116,27 @@ sub _build_template {
     $type =~ s/^pf:://;
     $type =~ s/::/\//g;
     return "${type}.html";
+}
+
+=head2 supportsPolling
+
+Whether or not the provisioner supports polling info for compliance check
+
+=cut
+
+sub supportsPolling {return 0}
+
+=head2 supportsPolling
+
+Whether or not the provisioner supports polling info for compliance check
+
+=cut
+
+sub pollChangedDevices {
+    my ($self, $timeframe) = @_;
+    my $logger = get_logger();
+    $logger->error("Called pollChangedDevices on a provisioner that doesn't support it");
+    return [];
 }
 
 =head2 matchCategory
@@ -141,11 +179,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

@@ -12,6 +12,7 @@ use pf::trigger;
 use pf::person qw(person_modify);
 use pf::Portal::Session;
 use pf::util;
+use pf::config::util;
 use pf::violation;
 use pf::web;
 use pf::web::billing 1.00;
@@ -243,13 +244,13 @@ sub showBilling : Private {
 
     $c->stash({
         'tiers' => \%tiers,
-        'selected_tier' => $request->param("tier") || '',
-        'firstname' => $request->param("firstname") || '',
-        'lastname' => $request->param("lastname") || '',
-        'email' => $request->param("email") || '',
-        'ccnumber' => $request->param("ccnumber") || '',
-        'ccexpiration' => $request->param("ccexpiration") || '',
-        'ccverification' => $request->param("ccverification") || '',
+        'selected_tier' => $request->param_encoded("tier") || '',
+        'firstname' => $request->param_encoded("firstname") || '',
+        'lastname' => $request->param_encoded("lastname") || '',
+        'email' => $request->param_encoded("email") || '',
+        'ccnumber' => $request->param_encoded("ccnumber") || '',
+        'ccexpiration' => $request->param_encoded("ccexpiration") || '',
+        'ccverification' => $request->param_encoded("ccverification") || '',
         'template' => 'billing/billing.html',
     });
 
@@ -261,7 +262,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
@@ -288,11 +289,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -163,7 +163,7 @@ sub refresh_access_token {
     if ( $curl_return_code != 0 or $curl_info != 200 ) { 
         # Failed to contact the SEPM.;
         $logger->error("Cannot connect to the SEPM to refresh the token");
-        return -1;   
+        return $pf::provisioner::COMMUNICATION_FAILED;   
     }
     else{
         
@@ -208,10 +208,10 @@ sub validate_ip_in_sepm {
 
     if ( $curl_info == 400 ) { 
         $logger->error("Unable to contact the SEPM on url ".$url);
-        return -1;   
+        return $pf::provisioner::COMMUNICATION_FAILED;   
     }
     elsif($curl_info != 200){
-        return -1;
+        return $pf::provisioner::COMMUNICATION_FAILED;
     } 
     else { 
         #check if ip address is there  
@@ -233,19 +233,19 @@ sub validate_ip_in_sepm {
 
 sub authorize {
     my ($self,$mac) = @_;
-    my $ip = mac2ip($mac); 
+    my $ip = pf::iplog::mac2ip($mac); 
     if(defined($ip)){
         my $logger = Log::Log4perl::get_logger( ref($self) );
         my $result = $self->validate_ip_in_sepm($ip); 
-        if( $result == -1){
+        if( $result == $pf::provisioner::COMMUNICATION_FAILED){
             $logger->info("SEPM Oauth access token is not valid anymore.");
             $self->refresh_access_token();
             $result = $self->validate_ip_in_sepm($ip);
         }
 
-        if($result == -1){
+        if($result == $pf::provisioner::COMMUNICATION_FAILED){
             $logger->error("Unable to contact SEPM to validate if IP $ip is registered.");
-            return -1;
+            return $pf::provisioner::COMMUNICATION_FAILED;
         }
         else{
             return $result;
@@ -260,11 +260,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

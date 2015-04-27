@@ -16,7 +16,7 @@ use warnings;
 use pf::log;
 use URI::Escape::XS;
 use Moo;
-use pf::config qw($TRUE $FALSE);
+use pf::constants qw($TRUE $FALSE);
 use List::MoreUtils qw(any);
 use pf::util qw(valid_mac clean_mac);
 use Sub::Name;
@@ -109,6 +109,14 @@ The relevanceExpr used to find the mac addresses
 
 has relevanceExpr => (is => 'rw');
 
+=head2 agent_download_uri
+
+The URI to download the agent
+
+=cut
+
+has agent_download_uri => (is => 'rw');
+
 sub _build_proxy {
     my ($self) = @_;
     return $self->protocol . '://' . $self->host . ":" . $self->port;
@@ -149,11 +157,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

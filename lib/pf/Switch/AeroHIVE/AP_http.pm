@@ -26,6 +26,7 @@ Using the default success page of AeroHIVE works.
 use strict;
 use warnings;
 use Log::Log4perl;
+use pf::constants;
 use pf::config;
 use pf::node;
 use pf::violation;
@@ -120,7 +121,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

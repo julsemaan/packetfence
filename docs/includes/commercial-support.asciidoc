@@ -6,7 +6,7 @@
     Authors:
       - Inverse inc. <info@inverse.ca>
 
-    Copyright (C) 2011, 2012 Inverse inc.
+    Copyright (C) 2005-2015 Inverse inc.
     License: GFDL 1.2 or later. http://www.gnu.org/licenses/fdl.html
 
 ////
@@ -23,6 +23,6 @@ from another system, performance tuning or aligning with best practices.
 
 Hourly rates or support packages are offered to best suit your needs.
 
-Please visit http://inverse.ca/support.html for details.
+Please visit http://inverse.ca/ for details.
 
 // vim: set syntax=asciidoc tabstop=2 shiftwidth=2 expandtab:

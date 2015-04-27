@@ -17,9 +17,11 @@ use Moo;
 extends 'pf::services::manager';
 with 'pf::services::manager::roles::pf_conf_trapping_engine';
 use pf::file_paths;
+use pf::constants;
 use pf::config;
 use pf::violation_config;
-use pf::util qw(get_all_internal_ips parse_template listify);
+use pf::util qw(parse_template listify);
+use pf::config::util;
 
 has '+name' => ( default => sub { 'snort' } );
 
@@ -74,11 +76,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

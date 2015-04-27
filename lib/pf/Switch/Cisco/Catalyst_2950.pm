@@ -92,6 +92,7 @@ use Net::Appliance::Session;
 use Net::SNMP;
 use Data::Dumper;
 
+use pf::constants;
 use pf::config;
 use pf::locationlog;
 sub description { 'Cisco Catalyst 2950' }
@@ -99,6 +100,7 @@ sub description { 'Cisco Catalyst 2950' }
 # importing switch constants
 use pf::Switch::constants;
 use pf::util;
+use pf::config::util;
 use pf::vlan::custom $VLAN_API_LEVEL;
 
 =head1 SUBROUTINES
@@ -1178,7 +1180,7 @@ sub getIfIndexByNasPortId {
     my $result = $this->{_sessionRead}->get_table( -baseoid => $OID_ifDesc );
     foreach my $key ( keys %{$result} ) {
         my $ifDesc = $result->{$key};
-        if ( $ifDesc =~ /$ifDesc_param$/i ) {
+        if ( $ifDesc =~ /^$ifDesc_param$/i ) {
             $key =~ /^$OID_ifDesc\.(\d+)$/;
             return $1;
         }
@@ -1193,7 +1195,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

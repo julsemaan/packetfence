@@ -69,7 +69,7 @@ sub do_query {
 sub add_searches {
     my ($self,$builder,$params) = @_;
     my @searches = map {$self->process_query($_)} @{$params->{searches}};
-    my $all_or_any = $params->{all_or_any};
+    my $all_or_any = $params->{all_or_any} || 'all';
     if ($all_or_any eq 'any' ) {
         $all_or_any = 'or';
     } else {
@@ -86,14 +86,15 @@ sub make_builder {
     my ($self) = @_;
     return pf::SearchBuilder->new
         ->select(qw(
-            mac pid voip bypass_vlan status category_id
+            mac pid voip bypass_vlan status category_id bypass_role_id
             user_agent computername last_arp last_dhcp notes),
             L_("IF(lastskip = '0000-00-00 00:00:00', '', lastskip)", 'lastskip'),
             L_("IF(detect_date = '0000-00-00 00:00:00', '', detect_date)", 'detect_date'),
             L_("IF(regdate = '0000-00-00 00:00:00', '', regdate)", 'regdate'),
             L_("IF(unregdate = '0000-00-00 00:00:00', '', unregdate)", 'unregdate'),
             L_("IFNULL(node_category.name, '')", 'category'),
-            L_("IFNULL(os_type.description, ' ')", 'dhcp_fingerprint'),
+            L_("IFNULL(node_category_bypass_role.name, '')", 'bypass_role'),
+            L_("IFNULL(device_class, ' ')", 'dhcp_fingerprint'),
             { table => 'iplog', name => 'ip', as => 'last_ip' }
         )->from('node',
                 {
@@ -115,65 +116,40 @@ sub make_builder {
                     ],
                 },
                 {
-                    'table' => 'dhcp_fingerprint',
+                    'table' => 'node_category',
+                    'as'  => 'node_category_bypass_role',
                     'join' => 'LEFT',
                     'on' =>
                     [
                         [
                             {
-                                'table'  => 'dhcp_fingerprint',
-                                'name'   => 'fingerprint',
+                                'table'  => 'node_category_bypass_role',
+                                'name'   => 'category_id',
                             },
                             '=',
                             {
                                 'table'  => 'node',
-                                'name'   => 'dhcp_fingerprint',
+                                'name'   => 'bypass_role_id',
                             }
                         ],
                     ],
                 },
                 {
                     'table' => 'iplog',
-                    'join' => 'LEFT',
-                    'on' =>
+                    'join'  => 'LEFT',
+                    'on'    =>
                     [
                         [
                             {
-                                'table'  => 'iplog',
-                                'name'   => 'mac',
+                                'table' => 'iplog',
+                                'name'  => 'ip',
                             },
                             '=',
-                            {
-                                'table'  => 'node',
-                                'name'   => 'mac',
-                            }
-                        ],
-                     [ 'AND' ],
-                     [ '(' ],
-                        [
-                            {
-                                'table'  => 'iplog',
-                                'name'   => 'end_time',
-                            },
-                            '=',
-                            '0000-00-00 00:00:00',
-                         ],
-                     [ 'OR' ],
-                        [
-                            {
-                                'table'  => 'iplog',
-                                'name'   => 'end_time',
-                            },
-                            '>',
-                            L_('NOW()'),
-                         ],
-                     [ ')' ],
+                            \"( SELECT `ip` FROM `iplog` WHERE `mac` = `node`.`mac`
+                                AND ( `iplog`.`end_time` = '0000-00-00 00:00:00' OR `iplog`.`end_time` > NOW() )
+                                        ORDER BY `start_time` DESC LIMIT 1 )"
+                        ]
                     ],
-                },
-                {
-                    'table' => 'os_type',
-                    'join' => 'LEFT',
-                    'using' => 'os_id',
                 },
         );
 }
@@ -184,9 +160,13 @@ my %COLUMN_MAP = (
         table => 'node_category',
         name  => 'name',
     },
+    bypass_role => {
+        table => 'node_category_bypass_role',
+        name  => 'name',
+    },
     dhcp_fingerprint   => {
-       table => 'os_type',
-       name  => 'description',
+       table => 'node',
+       name  => 'device_class',
     },
     switch_ip   => {
        table => 'locationlog_distinct',
@@ -281,21 +261,11 @@ sub add_order_by {
 
 sub add_date_range {
     my ($self, $builder, $params, $start, $end) = @_;
-    if ($start || $end) {
-        unless (grep { $_->{name} eq 'switch_ip'} @{$params->{searches}}) {
-            $builder->from(@{$COLUMN_MAP{switch_ip}{'joins'}})
-        }
-        if ($start) {
-            $builder->where({ table =>'locationlog', name => 'start_time' }, '>=', $start);
-        }
-        if ($end) {
-            $builder
-                ->where('(')
-                ->where({ table =>'locationlog', name => 'end_time' }, '<=' , $end)
-                ->or()
-                ->where({ table =>'locationlog', name => 'end_time' }, 'IS NULL')
-                ->where(')');
-        }
+    if ($start) {
+        $builder->where('detect_date', '>=', "$start 00:00");
+    }
+    if ($end) {
+        $builder->where('detect_date', '<=', "$end 23:59");
     }
 }
 
@@ -320,7 +290,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

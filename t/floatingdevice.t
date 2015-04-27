@@ -23,6 +23,7 @@ BEGIN {
     use_ok('pf::floatingdevice::custom');
 }
 
+use pf::constants;
 use pf::config;
 use pf::SwitchFactory;
 
@@ -37,8 +38,7 @@ can_ok($fd, qw(
     disablePortConfig
 ));
 
-my $switchFactory = new pf::SwitchFactory;
-my $switch = $switchFactory->instantiate('10.0.0.1');
+my $switch = pf::SwitchFactory->instantiate('10.0.0.1');
 my $switch_port = '10001';
 my $switch_locker;
 my $result;
@@ -115,7 +115,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

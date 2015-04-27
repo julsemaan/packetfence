@@ -24,6 +24,7 @@ use TestUtils;
 runtests(
     @TestUtils::compile_tests,
     @TestUtils::unit_tests,
+    TestUtils::get_all_unittests(),
     @TestUtils::cli_tests,
     @TestUtils::quality_tests,
     @TestUtils::config_store_test,
@@ -35,7 +36,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

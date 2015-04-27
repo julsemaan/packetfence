@@ -22,7 +22,6 @@ use JSON qw( decode_json );
 use XML::Simple;
 use Log::Log4perl;
 use pf::iplog;
-use pf::ConfigStore::Provisioning;
 use MIME::Base64;
 
 =head1 Atrributes
@@ -133,12 +132,12 @@ sub get_device_info{
         }
         else{
             $logger->error("The URL used for the mobileiron API seems invalid. Validate the configuration.");
-            return -1;
+            return $pf::provisioner::COMMUNICATION_FAILED;
         }
     }
     else{
         $logger->error("There was an error validating $mac with MobileIron. Got HTTP code $curl_info");
-        return -1;
+        return $pf::provisioner::COMMUNICATION_FAILED;
     }
 }
 
@@ -146,7 +145,7 @@ sub validate_mac_is_compliant{
     my ($self, $mac) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
     my $info = $self->get_device_info($mac);
-    if (defined($info) && ($info != -1 && $info != 0)){
+    if (defined($info) && ($info != $pf::provisioner::COMMUNICATION_FAILED && $info != 0)){
         if ($info->{device}->{compliance} == 0){
             $logger->info("Device $mac was found as compliant");
             return 1;
@@ -164,7 +163,7 @@ sub validate_mac_is_compliant{
 sub authorize {
     my ($self,$mac) = @_;
     my $logger = Log::Log4perl::get_logger( ref($self) );
-    my $ip = mac2ip($mac); 
+    my $ip = pf::iplog::mac2ip($mac); 
     $logger->info("Validating if $mac is compliant in mobileiron");
     return $self->validate_mac_is_compliant($mac);
        
@@ -176,11 +175,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

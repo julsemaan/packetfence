@@ -40,7 +40,7 @@ sub action {
 
     my $node_info = node_view($mac);
 
-    my @categories = split(/,/, $ConfigFirewallSSO{$firewall_conf}->{categories});
+    my @categories = @{$self->{categories}};
     if (
         defined($node_info) &&
         (ref($node_info) eq 'HASH') &&
@@ -85,7 +85,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

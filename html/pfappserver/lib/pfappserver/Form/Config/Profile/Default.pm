@@ -16,25 +16,15 @@ use HTML::FormHandler::Moose;
 extends 'pfappserver::Base::Form';
 with 'pfappserver::Form::Config::ProfileCommon';
 
-=head1 Blocks
-
-=head2 definition
-
-The main definition block
-
-=cut
-
-has_block 'definition' =>
-  (
-   render_list => [ qw(id description logo redirecturl always_use_redirecturl reuse_dot1x_credentials billing_engine nbregpages) ],
-  );
 
 has_field '+redirecturl' => ( required => 1 );
+
+has_field '+logo' => ( required => 1 );
 
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

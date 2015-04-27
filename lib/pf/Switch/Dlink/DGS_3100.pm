@@ -47,6 +47,7 @@ sub description { 'D-Link DGS 3100' }
 # importing switch constants
 use pf::Switch::constants;
 use pf::util;
+use pf::constants;
 use pf::config;
 
 =head1 SUBROUTINES
@@ -104,7 +105,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

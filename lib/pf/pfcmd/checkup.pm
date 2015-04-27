@@ -17,14 +17,20 @@ use Fcntl ':mode'; # symbolic file permissions
 use Try::Tiny;
 use Readonly;
 
+use pf::constants;
+use pf::constants::config qw($TIME_MODIFIER_RE);
 use pf::config;
 use pf::config::cached;
 use pf::violation_config;
 use pf::util;
+use pf::config::util;
 use pf::services;
 use pf::trigger;
 use pf::authentication;
 use NetAddr::IP;
+use pf::web::filter;
+use pfconfig::manager;
+use pfconfig::namespaces::config::Pf;
 
 use lib $conf_dir;
 
@@ -116,6 +122,7 @@ sub sanity_check {
 
     database();
     network();
+    fingerbank();
     inline() if (is_inline_enforcement_enabled());
     apache();
     web_admin();
@@ -128,6 +135,8 @@ sub sanity_check {
     portal_profiles();
     guests();
     unsupported();
+    vlan_filter_rules();
+    apache_filter_rules();
 
     return @problems;
 }
@@ -156,6 +165,9 @@ sub interfaces_defined {
 
     my $nb_management_interface = 0;
 
+    # TODO - change me ?
+    my $cached_pf_config = pfconfig::namespaces::config::Pf->new(pfconfig::manager->new);
+    $cached_pf_config->build();
     foreach my $interface ( $cached_pf_config->GroupMembers("interface") ) {
         my %int_conf = %{$Config{$interface}};
         my $int_with_no_config_required_regexp = qr/(?:monitor|dhcplistener|dhcp-listener|high-availability)/;
@@ -188,7 +200,7 @@ check the Netmask objs and make sure a managed and internal interface exist
 sub interfaces {
 
     if ( !scalar(get_internal_devs()) ) {
-        add_problem( $FATAL, "internal network(s) not defined!" );
+        add_problem( $WARN, "internal network(s) not defined!" );
     }
 
     my %seen;
@@ -254,6 +266,17 @@ sub freeradius {
     }
 }
 
+=item fingerbank
+
+Validation to make sure Fingerbank outside lib symlink is present
+
+=cut
+
+sub fingerbank {
+    if ( !-l '/usr/local/pf/lib/fingerbank' ) {
+        add_problem( $FATAL, "Fingerbank symlink does not exists" );
+    }
+}
 
 =item ids
 
@@ -494,10 +517,13 @@ sub database {
 
     try {
 
-        # make sure pid "admin" exists
+        # make sure pid "admin" and "default" exists
         require pf::person;
         if ( !pf::person::person_exist("admin") ) {
             add_problem( $FATAL, "person user id \"admin\" must exist - please reinitialize your database" );
+        }
+        if ( !pf::person::person_exist("default") ) {
+            add_problem( $FATAL, "person user id \"default\" must exist - please reinitialize your database" );
         }
 
     } catch {
@@ -546,7 +572,9 @@ sub registration {
 
 # TODO Consider moving to a test
 sub is_config_documented {
-
+    # TODO - change me ?
+    my $cached_pf_config = pfconfig::namespaces::config::Pf->new(pfconfig::manager->new);
+    $cached_pf_config->build();
     if (!-e $conf_dir . '/pf.conf') {
         add_problem($WARN, 'We have been unable to load your configuration. Are you sure you ran configurator ?');
         return;
@@ -562,19 +590,20 @@ sub is_config_documented {
         next if ( $section =~ /^(proxies|passthroughs)$/ || $group =~ /^(interface|services)$/ );
         next if ( ( $group eq 'alerting' ) && ( $item eq 'fromaddr' ) );
         next if ( ( $group eq 'provisioning' ) && ( $item eq 'certificate') );
+        next if ( $item =~ /^temporary_/i );
 
         if ( !exists $Config{$group} || !exists $Config{$group}{$item} ) {
             add_problem( $FATAL, "pf.conf value $group\.$item is not defined!" );
         } elsif (defined( $Config{$group}{$item} ) ) {
             if ( $type eq "time" ) {
-                if ( $cached_pf_config->val($group,$item) !~ /\d+$TIME_MODIFIER_RE$/ ) {
+                if ( $cached_pf_config->{_file_cfg}{$group}{$item} !~ /\d+$TIME_MODIFIER_RE$/ ) {
                     add_problem( $FATAL,
                         "pf.conf value $group\.$item does not explicity define interval (eg. 7200s, 120m, 2h) " .
                         "- please define it before running packetfence"
                     );
                 }
             } elsif ( $type eq "multi" || $type eq "toggle" ) {
-                my @selectedOptions = split( /\s*,\s*/, $cached_pf_config->val($group,$item) );
+                my @selectedOptions = split( /\s*,\s*/, $cached_pf_config->{_file_cfg}{$group}{$item} );
                 my @availableOptions = @{$Doc_Config{$section}{'options'}};
                 foreach my $currentSelectedOption (@selectedOptions) {
                     if ( grep(/^$currentSelectedOption$/, @availableOptions) == 0 ) {
@@ -599,6 +628,7 @@ sub is_config_documented {
                   || ($section =~ /^(services|interface|nessus_category_policy|nessus_scan_by_fingerprint)/));
 
         foreach my $item  (keys %{$Config{$section}}) {
+            next if ( $item =~ /^temporary_/i );
             if ( !defined( $Doc_Config{"$section.$item"} ) ) {
                 add_problem( $FATAL,
                     "unknown configuration parameter $section.$item ".
@@ -784,7 +814,7 @@ Checking for switches configurations
 
 sub switches {
     my %switches_conf;
-    tie %switches_conf, 'pf::config::cached', ( -file => "$conf_dir/switches.conf" );
+    tie %switches_conf, 'pf::config::cached', ( -file => "$conf_dir/switches.conf", -default => 'default' );
 
     my @errors = @Config::IniFiles::errors;
     if ( scalar(@errors) ) {
@@ -965,28 +995,89 @@ Make sure only one external authentication source is selected for each type.
 # TODO: We might want to check if specified auth module(s) are valid... to do so, we'll have to separate the auth thing from the extension check.
 sub portal_profiles {
 
-    my $profile_params = qr/(?:locale|filter|logo|guest_self_reg|guest_modes|template_path|billing_engine|description|sources|redirecturl|always_use_redirecturl|mandatory_fields|nbregpages|allowed_devices|allow_android_devices|reuse_dot1x_credentials|provisioners)/;
+    my $profile_params = qr/(?:locale |filter|logo|guest_self_reg|guest_modes|template_path|
+        billing_engine|description|sources|redirecturl|always_use_redirecturl|
+        mandatory_fields|nbregpages|allowed_devices|allow_android_devices|
+        reuse_dot1x_credentials|provisioners|filter_match_style|sms_pin_retry_limit|
+        sms_request_limit|login_attempt_limit|block_interval|dot1x_recompute_role_from_portal)/x;
 
-    foreach my $portal_profile ( $cached_profiles_config->Sections) {
-        if ($portal_profile ne 'default' && !-d "$install_dir/html/captive-portal/profile-templates/$portal_profile") {
+    foreach my $portal_profile ( keys %Profiles_Config ) {
+        my $data = $Profiles_Config{$portal_profile};
+        # Checks for the non default profiles
+        if ($portal_profile ne 'default' ) {
             add_problem( $WARN, "template directory '$install_dir/html/captive-portal/profile-templates/$portal_profile' for profile $portal_profile does not exist using default templates" )
+                if (!-d "$install_dir/html/captive-portal/profile-templates/$portal_profile");
+
+            add_problem ( $FATAL, "missing filter parameter for profile $portal_profile" )
+                if (!defined($data->{'filter'}) );
         }
 
-        add_problem ( $FATAL, "missing filter parameter for profile $portal_profile" )
-            if ( $portal_profile ne 'default' &&  !defined($Profiles_Config{$portal_profile}{'filter'}) );
 
-        foreach my $key ( keys %{$Profiles_Config{$portal_profile}} ) {
+        foreach my $key ( keys %$data ) {
             add_problem( $WARN, "invalid parameter $key for profile $portal_profile" )
                 if ( $key !~ /$profile_params/ );
         }
 
         my %external;
-        foreach my $source ( grep { $_ && $_->class eq 'external' } map { pf::authentication::getAuthenticationSource($_) } @{$Profiles_Config{$portal_profile}{'sources'}} ) {
+        # Verifing there is only one external source of each type
+        foreach my $source ( grep { $_ && $_->class eq 'external' } map { pf::authentication::getAuthenticationSource($_) } @{$data->{'sources'}} ) {
             my $type = $source->{'type'};
             $external{$type} = 0 unless (defined $external{$type});
             $external{$type}++;
             add_problem ( $FATAL, "many authentication sources of type $type are selected for profile $portal_profile" )
               if ($external{$type} > 1);
+        }
+    }
+}
+
+=item vlan_filter_rules
+
+Make sure that the minimum parameters have been defined in vlan filter rules
+
+=cut
+
+sub vlan_filter_rules {
+    my %ConfigVlanFilters = %pf::vlan::filter::ConfigVlanFilters;
+    foreach my $rule  ( sort keys  %ConfigVlanFilters ) {
+        if ($rule =~ /^\w+:(.*)$/) {
+            add_problem ( $FATAL, "Missing scope attribute in $rule vlan filter rule")
+                if (!defined($ConfigVlanFilters{$rule}->{'scope'}));
+            add_problem ( $FATAL, "Missing role attribute in $rule vlan filter rule")
+                if (!defined($ConfigVlanFilters{$rule}->{'role'}));
+        } else {
+            add_problem ( $FATAL, "Missing filter attribute in $rule vlan filter rule")
+                if (!defined($ConfigVlanFilters{$rule}->{'filter'}));
+            add_problem ( $FATAL, "Missing operator attribute in $rule vlan filter rule")
+                if (!defined($ConfigVlanFilters{$rule}->{'operator'}));
+            add_problem ( $FATAL, "Missing value attribute in $rule vlan filter rule")
+                if (!defined($ConfigVlanFilters{$rule}->{'value'}));
+        }
+    }
+}
+
+=item apache_filter_rules
+
+Make sure that the minimum parameters have been defined in apache filter rules
+
+=cut
+
+sub apache_filter_rules {
+    my %ConfigApacheFilters = %pf::web::filter::ConfigApacheFilters;
+    foreach my $rule  ( sort keys  %ConfigApacheFilters ) {
+        if ($rule =~ /^\w+:(.*)$/) {
+            add_problem ( $FATAL, "Missing action attribute in $rule apache filter rule")
+                if (!defined($ConfigApacheFilters{$rule}->{'action'}));
+            add_problem ( $FATAL, "Missing redirect_url attribute in $rule apache filter rule")
+                if (!defined($ConfigApacheFilters{$rule}->{'redirect_url'}));
+        } else {
+            add_problem ( $FATAL, "Missing filter attribute in $rule apache filter rule")
+                if (!defined($ConfigApacheFilters{$rule}->{'filter'}));
+            add_problem ( $FATAL, "Missing method attribute in $rule apache filter rule")
+                if (!defined($ConfigApacheFilters{$rule}->{'method'}));
+            add_problem ( $FATAL, "Missing value attribute in $rule apache filter rule")
+                if (!defined($ConfigApacheFilters{$rule}->{'value'}));
+            add_problem ( $FATAL, "Missing operator attribute in $rule apache filter rule")
+                if (!defined($ConfigApacheFilters{$rule}->{'operator'}));
         }
     }
 }
@@ -999,7 +1090,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

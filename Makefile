@@ -6,7 +6,7 @@ all:
 	@echo " 'doc-developers-pdf' will build the Develoeprs guide in PDF"
 	@echo " 'doc-networkdevices-pdf' will build the Network Devices Configuration guide in PDF"
 
-pdf: doc-admin-pdf doc-developers-pdf doc-networkdevices-pdf doc-opswat-pdf doc-mobileiron-pdf doc-sepm-pdf doc-paloalto-pdf doc-barracuda-pdf doc-fortigate-pdf
+pdf: doc-admin-pdf doc-developers-pdf doc-networkdevices-pdf doc-opswat-pdf doc-mobileiron-pdf doc-sepm-pdf doc-paloalto-pdf doc-barracuda-pdf doc-fortigate-pdf doc-opendaylight-pdf doc-checkpoint-pdf
 
 doc-admin-pdf:
 	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_Administration_Guide.docbook docs/PacketFence_Administration_Guide.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_Administration_Guide.docbook  -pdf docs/PacketFence_Administration_Guide.pdf
@@ -16,7 +16,6 @@ doc-developers-pdf:
 
 doc-mobileiron-pdf:
 	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_MobileIron_Quick_Install_Guide.docbook docs/PacketFence_MobileIron_Quick_Install_Guide.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_MobileIron_Quick_Install_Guide.docbook  -pdf docs/PacketFence_MobileIron_Quick_Install_Guide.pdf
-
 
 doc-networkdevices-pdf:
 	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_Network_Devices_Configuration.docbook docs/PacketFence_Network_Devices_Configuration_Guide.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_Network_Devices_Configuration.docbook -pdf docs/PacketFence_Network_Devices_Configuration.pdf
@@ -42,10 +41,23 @@ doc-barracuda-pdf:
 doc-opendaylight-pdf:
 	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_OpenDaylight_Install_Guide.docbook docs/PacketFence_OpenDaylight_Install_Guide.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_OpenDaylight_Install_Guide.docbook  -pdf docs/PacketFence_OpenDaylight_Install_Guide.pdf
 
+doc-checkpoint-pdf:
+	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_Checkpoint_Quick_Install_Guide.docbook docs/PacketFence_Checkpoint_Quick_Install_Guide.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_Checkpoint_Quick_Install_Guide.docbook  -pdf docs/PacketFence_Checkpoint_Quick_Install_Guide.pdf
+
+doc-clustering-pdf:
+	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_Clustering_Guide.docbook docs/PacketFence_Clustering_Guide.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_Clustering_Guide.docbook  -pdf docs/PacketFence_Clustering_Guide.pdf
+
+doc-out-of-band-zen:
+	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_Out-of-Band_Deployment_Quick_Guide_ZEN.docbook docs/PacketFence_Out-of-Band_Deployment_Quick_Guide_ZEN.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_Out-of-Band_Deployment_Quick_Guide_ZEN.docbook  -pdf docs/PacketFence_Out-of-Band_Deployment_Quick_Guide_ZEN.pdf
+
+doc-inline-zen:
+	asciidoc -a docinfo2 -b docbook -d book -d book -o docs/docbook/PacketFence_Inline_Deployment_Quick_Guide_ZEN.docbook docs/PacketFence_Inline_Deployment_Quick_Guide_ZEN.asciidoc; fop -c docs/fonts/fop-config.xml   -xsl docs/docbook/xsl/packetfence-fo.xsl -xml docs/docbook/PacketFence_Inline_Deployment_Quick_Guide_ZEN.docbook  -pdf docs/PacketFence_Inline_Deployment_Quick_Guide_ZEN.pdf
+
 .PHONY: configurations
 
 configurations:
 	find -type f -name '*.example' -print0 | while read -d $$'\0' file; do cp -n $$file "$$(dirname $$file)/$$(basename $$file .example)"; done
+	touch /usr/local/pf/conf/pf.conf
 
 .PHONY: ssl-certs
 
@@ -106,13 +118,17 @@ translation:
 .PHONY: mysql-schema
 
 mysql-schema:
-	cd /usr/local/pf/db;\
-	VERSIONSQL=$$( ls -r pf-schema-[0-9]*.[0-9]*.[0-9]*.sql | head -1);\
-	ln -f -s $$VERSIONSQL ./pf-schema.sql;
+	ln -f -s /usr/local/pf/db/pf-schema-X.Y.Z.sql /usr/local/pf/db/pf-schema.sql;
 
 .PHONY: chown_pf
 
 chown_pf:
 	chown -R pf:pf *
 
-devel: configurations conf/ssl/server.crt bin/pfcmd raddb/certs/dh sudo lib/pf/pfcmd/pfcmd_pregrammar.pm translation mysql-schema raddb/sites-enabled chown_pf permissions
+.PHONY: fingerbank
+
+fingerbank:
+	rm -f /usr/local/pf/lib/fingerbank
+	ln -s /usr/local/fingerbank/lib/fingerbank /usr/local/pf/lib/fingerbank \
+
+devel: configurations conf/ssl/server.crt bin/pfcmd raddb/certs/dh sudo lib/pf/pfcmd/pfcmd_pregrammar.pm translation mysql-schema raddb/sites-enabled fingerbank chown_pf permissions

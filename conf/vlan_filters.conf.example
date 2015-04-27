@@ -1,6 +1,7 @@
 # Vlan filter configuration
 # 
-# you can trigger rule on specific scope (NormalVlan, RegistrationVlan, ViolationVlan, AutoRegister, InlineVlan)
+# you can trigger rule on specific scope (NormalVlan, RegistrationVlan, ViolationVlan, AutoRegister, InlineVlan, NodeInfoForAutoReg, IsPhone)
+# CAUTION: The IsPhone scope is only available on RADIUS based switches
 #
 # Make a simple rule like this:
 #
@@ -39,9 +40,33 @@
 # scope = NormalVlan
 # role = nointernet
 #
+# This will autoregister any device beginning by a set of known Avaya MAC address OUI and consider it as phone
+#
+# [avaya_phones]
+# filter = node_info
+# operator = match
+# attribute = mac
+# value = ^(00:04:0d|84:83:71|00:07:3b|00:09:6e|00:0d:18|00:0d:28|00:1b:4f|24:d9:21|2c:f4:c5|34:75:c7|3c:b1:5b|70:38:ee|b4:b0:17).*
+#
+# [autoreg:avaya_phones]
+# scope = IsPhone
+# role = default
+#
 # It means that when PacketFence tries to get the normal VLAN for the node and if the category of the node is 
 # the default one and the ssid is OpenWrt-SECURE and the time is between 11am and 2pm from Monday to Friday,
 # we return the role "nointernet" (which you will have configured in the switch configuration).
+#
+# Web API call:
+#
+# [3:3]
+# scope = NormalVlan
+# action = trigger_violation
+# action_param = mac = $mac, tid = 1100010, type = INTERNAL
+#
+# It means that if the SSID is OpenWrt-SECURE then we send a API call to the function trigger_violation and
+# trigger the violation 1100010
+#
+# action_param is computed by PacketFence so you can set static and dynamic values
 #
 # filter can be:
 #
@@ -54,6 +79,7 @@
 #     ssid
 #     time
 #     owner
+#     radius_request
 #
 # operator can be:
 #     is
@@ -142,6 +168,21 @@
 #    can_sponsor
 #    unregdate
 #    category
+#
+# - for the radius_request
+#    All the attributes you can have in the RADIUS request (run FreeRADIUS in debug mode to see these attributes)
+#
+# action can be:
+#
+#    deregister_node (require param => mac)
+#    register_node (require param => mac pid)
+#    modify_node (require param => mac)
+#    trigger_violation (require param => mac tid type)
+#
+# action_param can be:
+#    The require param and optional attributes like (for action = modify_node):
+#    action_param = mac = $mac, notes = $radius_request->{'Called-Station-Id'}
+#
 #
 # The value of a time is specific and follow this logic:
 # http://search.cpan.org/~pryan/Period-1.20/Period.pm

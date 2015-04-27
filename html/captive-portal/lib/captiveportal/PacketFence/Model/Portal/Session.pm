@@ -1,14 +1,13 @@
 package captiveportal::PacketFence::Model::Portal::Session;
 use Moose;
 
-use pf::iplog qw(ip2mac);
+use pf::iplog;
 use pf::config;
 use constant LOOPBACK_IPV4 => '127.0.0.1';
 use pf::log;
 use pf::util;
 use pf::locationlog qw(locationlog_synchronize);
 use NetAddr::IP;
-use pf::iplog qw(iplog_open);
 use pf::Portal::ProfileFactory;
 use File::Spec::Functions qw(catdir);
 use pf::activation qw(view_by_code);
@@ -30,7 +29,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
@@ -83,8 +82,14 @@ has redirectURL => (
     is       => 'rw',
 );
 
-has destination_url => (
+has _destination_url => (
     is       => 'rw',
+);
+
+has destinationUrl => (
+    is      => 'ro',
+    builder => '_build_destinationUrl',
+    lazy => 1,
 );
 
 has [qw(forwardedFor guestNodeMac)] => ( is => 'rw', );
@@ -92,6 +97,8 @@ has [qw(forwardedFor guestNodeMac)] => ( is => 'rw', );
 sub ACCEPT_CONTEXT {
     my ( $self, $c, @args ) = @_;
     my $class = ref $self || $self;
+    my $previous_model = $c->session->{$class};
+    return $previous_model if(defined($previous_model) && $previous_model->{options}->{in_uri_portal});
     my $model;
     my $request       = $c->request;
     my $r = $request->{'env'}->{'psgi.input'};
@@ -100,15 +107,15 @@ sub ACCEPT_CONTEXT {
     my $redirectURL;
     my $uri = $request->uri;
     my $options;
-    my $destination_url;
     my $mgmt_ip = $management_network->{'Tvip'} || $management_network->{'Tip'} if $management_network;
-    $destination_url = $request->param('destination_url') if defined($request->param('destination_url'));
+    my $destination_url = $request->param('destination_url');
 
-    if( $r->isa('Apache2::Request') &&  defined ( my $last_uri = $r->pnotes('last_uri') )) {
+    if( $r->can('pnotes') && defined ( my $last_uri = $r->pnotes('last_uri') )) {
         $options = {
             'last_uri' => $last_uri,
+            'in_uri_portal' => 1,
         };
-    } elsif ( $c->controller->isa('captiveportal::Controller::Activate::Email') && $c->action->name eq 'code' ) {
+    } elsif ( $c->action && $c->controller->isa('captiveportal::Controller::Activate::Email') && $c->action->name eq 'code' ) {
         my $code = $c->request->arguments->[0];
         my $data = view_by_code("1:".$code);
         $options = {
@@ -124,22 +131,23 @@ sub ACCEPT_CONTEXT {
         remoteAddress => $remoteAddress,
         forwardedFor  => $forwardedFor,
         options       => $options,
-        destination_url => $destination_url,
+        _destination_url => $destination_url,
         @args,
     );
+    $c->session->{$class} = $model;
     return $model;
 }
 
 sub _build_destinationUrl {
     my ($self) = @_;
-
+    my $url = $self->_destination_url;
     # Return portal profile's redirection URL if destination_url is not set or if redirection URL is forced
-    if (!defined($self->destination_url) || isenabled($self->profile->forceRedirectURL)) {
+    if (!defined($url) || isenabled($self->profile->forceRedirectURL)) {
         return $self->profile->getRedirectURL;
     }
 
     # Respect the user's initial destination URL
-    return decode_entities(uri_unescape($self->destination_url));
+    return decode_entities(uri_unescape($url));
 }
 
 sub _build_clientIp {
@@ -195,11 +203,11 @@ sub _build_clientMac {
                 my $fake_mac = '00:00:' . join(':', map { sprintf("%02x", $_) } split /\./, $ip->addr());
                 my $gateway = $network_config->{'gateway'};
                 locationlog_synchronize($gateway, $gateway, undef, $NO_PORT, $NO_VLAN, $fake_mac, $NO_VOIP, $INLINE);
-                iplog_open($fake_mac, $ip->addr());
+                pf::iplog::open($ip->addr(), $fake_mac);
                 return $fake_mac;
             }
         }
-        return ip2mac( $clientIp );
+        return pf::iplog::ip2mac( $clientIp );
     }
     return undef;
 }

@@ -23,12 +23,15 @@ use Readonly;
 
 use pf::authentication;
 use pf::Connection;
+use pf::constants;
+use pf::constants::trigger qw($TRIGGER_TYPE_ACCOUNTING);
 use pf::config;
 use pf::locationlog;
 use pf::node;
 use pf::Switch;
 use pf::SwitchFactory;
 use pf::util;
+use pf::config::util;
 use pf::trigger;
 use pf::violation;
 use pf::vlan::custom $VLAN_API_LEVEL;
@@ -36,6 +39,9 @@ use pf::floatingdevice::custom;
 # constants used by this module are provided by
 use pf::radius::constants;
 use List::Util qw(first);
+use Time::HiRes;
+use pf::util::statsd qw(called);
+use pf::vlan::filter;
 
 our $VERSION = 1.03;
 
@@ -72,10 +78,12 @@ See http://search.cpan.org/~byrne/SOAP-Lite/lib/SOAP/Lite.pm#IN/OUT,_OUT_PARAMET
 sub authorize {
     my ($this, $radius_request) = @_;
     my $logger = Log::Log4perl::get_logger(ref($this));
-    my($switch_mac, $switch_ip,$source_ip) = $this->_parseRequest($radius_request);
+    my($switch_mac, $switch_ip,$source_ip,$stripped_user_name,$realm) = $this->_parseRequest($radius_request);
+
+    my $start = Time::HiRes::gettimeofday();
 
     $logger->debug("instantiating switch");
-    my $switch = pf::SwitchFactory->getInstance()->instantiate({ switch_mac => $switch_mac, switch_ip => $switch_ip, controllerIp => $source_ip});
+    my $switch = pf::SwitchFactory->instantiate({ switch_mac => $switch_mac, switch_ip => $switch_ip, controllerIp => $source_ip});
 
     # is switch object correct?
     if (!$switch) {
@@ -91,7 +99,7 @@ sub authorize {
     my $connection = pf::Connection->new;
     $connection->identifyType($nas_port_type, $eap_type, $mac, $user_name, $switch);
     my $connection_type = $connection->attributesToBackwardCompatible;
-    
+
     $port = $switch->getIfIndexByNasPortId($nas_port_id) || $this->_translateNasPortToIfIndex($connection_type, $switch, $port);
 
     $logger->trace("received a radius authorization request with parameters: ".
@@ -111,7 +119,7 @@ sub authorize {
 
     $logger->info("[$mac] handling radius autz request: from switch_ip => ($switch_ip), "
         . "connection_type => " . connection_type_to_str($connection_type) . ","
-        . "switch_mac => ($switch_mac), mac => [$mac], port => $port, username => \"$user_name\"");
+        . "switch_mac => ".( defined($switch_mac) ? "($switch_mac)" : "(Unknown)" ).", mac => [$mac], port => $port, username => \"$user_name\"");
 
     #add node if necessary
     if ( !node_exist($mac) ) {
@@ -121,6 +129,12 @@ sub authorize {
 
     # There is activity from that mac, call node wakeup
     node_mac_wakeup($mac);
+
+    # Handling machine auth detection
+    if ( defined($user_name) && $user_name =~ /^host\// ) {
+        $logger->info("[$mac] is doing machine auth with account '$user_name'.");
+        node_modify($mac, ('machine_account' => $user_name));
+    }
 
     if (defined($session_id)) {
          node_modify($mac, ('sessionid' => $session_id));
@@ -141,24 +155,30 @@ sub authorize {
         $logger->debug("SSID resolved to: $ssid") if (defined($ssid));
     }
 
+    # Vlan Filter
+    my $filter = new pf::vlan::filter;
+    my $node_info = node_attributes($mac);
+    my ($result,$role) = $filter->test('IsPhone',$switch, $port, $mac, $node_info, $connection_type, $user_name, $ssid, $radius_request);
     # determine if we need to perform automatic registration
-    my $isPhone = $switch->isPhoneAtIfIndex($mac, $port);
+    # either the switch detects that this is a phone or we take the result from the vlan filters
+    my $isPhone = $switch->isPhoneAtIfIndex($mac, $port) || ($result != 0);
 
     my $vlan_obj = new pf::vlan::custom();
+    my $autoreg = 0;
     # should we auto-register? let's ask the VLAN object
     if ($vlan_obj->shouldAutoRegister($mac, $switch->isRegistrationMode(), 0, $isPhone,
         $connection_type, $user_name, $ssid, $eap_type, $switch, $port, $radius_request)) {
-
+        $autoreg = 1;
         # automatic registration
-        my %autoreg_node_defaults = $vlan_obj->getNodeInfoForAutoReg($switch->{_id}, $port,
-            $mac, undef, $switch->isRegistrationMode(), $FALSE, $isPhone, $connection_type, $user_name, $ssid, $eap_type);
+        my %autoreg_node_defaults = $vlan_obj->getNodeInfoForAutoReg($switch, $port,
+            $mac, undef, $switch->isRegistrationMode(), $FALSE, $isPhone, $connection_type, $user_name, $ssid, $eap_type, $radius_request, $realm, $stripped_user_name);
 
         $logger->debug("[$mac] auto-registering node");
         if (!node_register($mac, $autoreg_node_defaults{'pid'}, %autoreg_node_defaults)) {
             $logger->error("[$mac] auto-registration of node failed");
         }
         $switch->synchronize_locationlog($port, undef, $mac, $isPhone ? $VOIP : $NO_VOIP,
-            $connection_type, $user_name, $ssid);
+            $connection_type, $user_name, $ssid, $stripped_user_name, $realm);
     }
 
     # if it's an IP Phone, let _authorizeVoip decide (extension point)
@@ -179,7 +199,7 @@ sub authorize {
     $this->_handleAccessFloatingDevices($switch, $mac, $port);
 
     # Fetch VLAN depending on node status
-    my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $switch, $port, $connection_type, $user_name, $ssid, $radius_request);
+    my ($vlan, $wasInline, $user_role) = $vlan_obj->fetchVlanForNode($mac, $switch, $port, $connection_type, $user_name, $ssid, $radius_request, $realm, $stripped_user_name, $autoreg);
 
     # should this node be kicked out?
     if (defined($vlan) && $vlan == -1) {
@@ -192,7 +212,7 @@ sub authorize {
     #closes old locationlog entries and create a new one if required
     #TODO: Better deal with INLINE RADIUS
     $switch->synchronize_locationlog($port, $vlan, $mac,
-        $isPhone ? $VOIP : $NO_VOIP, $connection_type, $user_name, $ssid
+        $isPhone ? $VOIP : $NO_VOIP, $connection_type, $user_name, $ssid, $stripped_user_name, $realm
     ) if (!$wasInline);
 
     # does the switch support Dynamic VLAN Assignment, bypass if using Inline
@@ -218,6 +238,8 @@ sub authorize {
     $switch->disconnectRead();
     $switch->disconnectWrite();
 
+    $pf::StatsD::statsd->end(called() . ".timing" , $start );
+
     return $RAD_REPLY_REF;
 }
 
@@ -228,17 +250,18 @@ sub authorize {
 sub accounting {
     my ($this, $radius_request) = @_;
     my $logger = Log::Log4perl::get_logger(ref($this));
+    my $start = Time::HiRes::gettimeofday();
 
-    my ( $switch_mac, $switch_ip, $source_ip ) = $this->_parseRequest($radius_request);
+    my ( $switch_mac, $switch_ip, $source_ip, $stripped_user_name, $realm ) = $this->_parseRequest($radius_request);
 
     $logger->debug("instantiating switch");
-    my $switch = pf::SwitchFactory->getInstance()
-        ->instantiate( { switch_mac => $switch_mac, switch_ip => $switch_ip, controllerIp => $source_ip } );
+    my $switch = pf::SwitchFactory->instantiate( { switch_mac => $switch_mac, switch_ip => $switch_ip, controllerIp => $source_ip } );
 
     # is switch object correct?
     if ( !$switch ) {
         $logger->warn( "Can't instantiate switch ($switch_ip). This request will be failed. "
                 . "Are you sure your switches.conf is correct?" );
+        $pf::StatsD::statsd->increment(called() . ".error" );
         return [ $RADIUS::RLM_MODULE_FAIL, ( 'Reply-Message' => "Switch is not managed by PacketFence" ) ];
     }
 
@@ -252,7 +275,7 @@ sub accounting {
         $connection->identifyType($nas_port_type, $eap_type, $mac, $user_name, $switch);
         my $connection_type = $connection->attributesToBackwardCompatible;
 
-        $port = $switch->getIfIndexByNasPortId($nas_port_id) || $this->_translateNasPortToIfIndex($connection_type, $switch, $port); 
+        $port = $switch->getIfIndexByNasPortId($nas_port_id) || $this->_translateNasPortToIfIndex($connection_type, $switch, $port);
 
         if($isStop){
             #handle radius floating devices
@@ -287,7 +310,50 @@ sub accounting {
         }
     }
 
+    $pf::StatsD::statsd->end(called() . ".timing" , $start, 0.05 );
     return [ $RADIUS::RLM_MODULE_OK, ('Reply-Message' => "Accounting ok") ];
+}
+
+=item update_locationlog_accounting
+
+Update the location log based on the accounting information
+
+=cut
+
+sub update_locationlog_accounting {
+    my ($this, $radius_request) = @_;
+    my $logger = Log::Log4perl::get_logger(ref($this));
+    my $start = Time::HiRes::gettimeofday();
+
+    my ( $switch_mac, $switch_ip, $source_ip, $stripped_user_name, $realm ) = $this->_parseRequest($radius_request);
+
+    $logger->debug("instantiating switch");
+    my $switch = pf::SwitchFactory->instantiate( { switch_mac => $switch_mac, switch_ip => $switch_ip, controllerIp => $source_ip } );
+
+    # is switch object correct?
+    if ( !$switch ) {
+        $logger->warn( "Can't instantiate switch ($switch_ip). This request will be failed. "
+                . "Are you sure your switches.conf is correct?" );
+        $pf::StatsD::statsd->increment(called() . ".error" );
+        return [ $RADIUS::RLM_MODULE_FAIL, ( 'Reply-Message' => "Switch is not managed by PacketFence" ) ];
+    }
+
+    if ($switch->supportsRoamingAccounting()) {
+        my ($nas_port_type, $eap_type, $mac, $port, $user_name, $nas_port_id, $session_id) = $switch->parseRequest($radius_request);
+        my $connection = pf::Connection->new;
+        $connection->identifyType($nas_port_type, $eap_type, $mac, $user_name, $switch);
+        my $connection_type = $connection->attributesToBackwardCompatible;
+        my $ssid;
+        if (($connection_type & $WIRELESS) == $WIRELESS) {
+            $ssid = $switch->extractSsid($radius_request);
+            $logger->debug("SSID resolved to: $ssid") if (defined($ssid));
+        }
+        my $vlan;
+        $vlan = $radius_request->{'Tunnel-Private-Group-ID'} if ( (defined( $radius_request->{'Tunnel-Type'}) && $radius_request->{'Tunnel-Type'} eq '13') && (defined($radius_request->{'Tunnel-Medium-Type'}) && $radius_request->{'Tunnel-Medium-Type'} eq '6') );
+        $switch->synchronize_locationlog($port, $vlan, $mac, undef, $connection_type, $user_name, $ssid, $stripped_user_name, $realm);
+    }
+    $pf::StatsD::statsd->end(called() . ".timing" , $start, 0.05 );
+    return [ $RADIUS::RLM_MODULE_OK, ('Reply-Message' => "Update locationlog from accounting ok") ];
 }
 
 =item * _parseRequest
@@ -301,15 +367,23 @@ Takes FreeRADIUS' RAD_REQUEST hash and process it to return
 
 sub _parseRequest {
     my ($this, $radius_request) = @_;
-    my $ap_mac = extractApMacFromRadiusRequest($radius_request);
+    my $ap_mac = $this->extractApMacFromRadiusRequest($radius_request);
     # freeradius 2 provides the client IP in NAS-IP-Address not Client-IP-Address (non-standard freeradius1 attribute)
     my $networkdevice_ip = $radius_request->{'NAS-IP-Address'} || $radius_request->{'Client-IP-Address'};
     my $source_ip = $radius_request->{'FreeRADIUS-Client-IP-Address'};
-    return ($ap_mac, $networkdevice_ip, $source_ip);
+    my $stripped_user_name;
+    if (defined($radius_request->{'Stripped-User-Name'})) {
+        $stripped_user_name = $radius_request->{'Stripped-User-Name'};
+    }
+    my $realm;
+    if (defined($radius_request->{'Realm'})) {
+        $realm = $radius_request->{'Realm'};
+    }
+    return ($ap_mac, $networkdevice_ip, $source_ip, $stripped_user_name, $realm);
 }
 
 sub extractApMacFromRadiusRequest {
-    my ($radius_request) = @_;
+    my ($this, $radius_request) = @_;
     my $logger = Log::Log4perl::get_logger(__PACKAGE__);
     # it's put in Called-Station-Id
     # ie: Called-Station-Id = "aa-bb-cc-dd-ee-ff:Secure SSID" or "aa:bb:cc:dd:ee:ff:Secure SSID"
@@ -411,12 +485,14 @@ Returns the same structure as authorize(), see it's POD doc for details.
 sub _authorizeVoip {
     my ($this, $connection_type, $switch, $mac, $port, $user_name, $ssid) = @_;
     my $logger = Log::Log4perl::get_logger(ref($this));
+    my $start = Time::HiRes::gettimeofday();
 
     if (!$switch->supportsRadiusVoip()) {
         $logger->warn("[$mac] Returning failure to RADIUS.");
         $switch->disconnectRead();
         $switch->disconnectWrite();
 
+        $pf::StatsD::statsd->end(called() . ".timing" , $start, 0.05 );
         return [
             $RADIUS::RLM_MODULE_FAIL,
             ('Reply-Message' => "Server reported: VoIP authorization over RADIUS not supported for this network device")
@@ -427,6 +503,7 @@ sub _authorizeVoip {
     my %RAD_REPLY = $switch->getVoipVsa();
     $switch->disconnectRead();
     $switch->disconnectWrite();
+    $pf::StatsD::statsd->end(called() . ".timing" , $start, 0.05 );
     return [$RADIUS::RLM_MODULE_OK, %RAD_REPLY];
 }
 
@@ -523,6 +600,7 @@ sub _rewriteAccessAccept {
 
 sub _handleStaticPortSecurityMovement {
     my ($self,$switch,$mac) = @_;
+    my $start = Time::HiRes::gettimeofday();
     my $logger = Log::Log4perl::get_logger("pf::radius");
     #determine if $mac is authorized elsewhere
     my $locationlog_mac = locationlog_view_open_mac($mac);
@@ -533,8 +611,7 @@ sub _handleStaticPortSecurityMovement {
     #Nothing to do if it is the same switch
     return if $old_switch_id eq $switch->{_id};
 
-    my $switchFactory = pf::SwitchFactory->getInstance();
-    my $oldSwitch = $switchFactory->instantiate($old_switch_id);
+    my $oldSwitch = pf::SwitchFactory->instantiate($old_switch_id);
     if (!$oldSwitch) {
         $logger->error("Can not instantiate switch $old_switch_id !");
         return;
@@ -564,10 +641,11 @@ sub _handleStaticPortSecurityMovement {
     } else {
         $logger->info("MAC not found on node's previous switch secure table or switch inaccessible.");
     }
+    $pf::StatsD::statsd->end(called() . ".timing" , $start, 0.1 );
     locationlog_update_end_mac($mac);
 }
 
-=item * _handleFloatingDevices 
+=item * _handleFloatingDevices
 
 Takes care of handling the flow for the RADIUS floating devices when receiving an Accept-Request
 
@@ -579,7 +657,7 @@ sub _handleAccessFloatingDevices{
     if( exists( $ConfigFloatingDevices{$mac} ) ){
         my $floatingDeviceManager = new pf::floatingdevice::custom();
         $floatingDeviceManager->enableMABFloating($mac, $switch, $port);
-    } 
+    }
 }
 
 =item * _handleAccountingFloatingDevices
@@ -603,10 +681,10 @@ sub _handleAccountingFloatingDevices{
         }
 
         $logger->info("Floating device $mac has just been detected as unplugged. Disabling floating device mode on $switch->{_ip} port $port");
-        # close location log entry to remove the port from the floating mode. 
+        # close location log entry to remove the port from the floating mode.
         locationlog_update_end_mac($mac);
         # disable floating device mode on the port
-        $floatingDeviceManager->disableMABFloating($switch, $port); 
+        $floatingDeviceManager->disableMABFloating($switch, $port);
     }
 }
 
@@ -618,7 +696,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -18,6 +18,7 @@ extends 'HTML::FormHandler::Field::Compound';
 use namespace::autoclean;
 
 use pf::config;
+use pf::constants::config qw($TIME_MODIFIER_RE $DEADLINE_UNIT);
 
 =head1 ATTRIBUTES
 
@@ -136,7 +137,7 @@ sub duration_deflate {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

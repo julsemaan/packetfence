@@ -29,6 +29,7 @@ use base ('pf::Switch::Juniper');
 use Log::Log4perl;
 use Net::Appliance::Session;
 
+use pf::constants;
 use pf::config;
 sub description { 'Juniper EX 2200 Series' }
 
@@ -285,11 +286,12 @@ sub wiredeauthTechniques {
 
 }
 
-=item enableMABFloatingDevice
+=head2 enableMABFloatingDevice
 
 Connects to the switch and configures the specified port to be RADIUS floating device ready
 
 =cut
+
 sub enableMABFloatingDevice{
     my ($this, $ifIndex) = @_; 
     my $logger = Log::Log4perl::get_logger( ref($this) );
@@ -316,7 +318,7 @@ sub enableMABFloatingDevice{
 
     my $port = $this->getIfName($ifIndex);
 
-    my $command_mac_limit = "set ethernet-switching-options secure-access-port interface $port mac-limit 26000";
+    my $command_mac_limit = "set ethernet-switching-options secure-access-port interface $port mac-limit 16383";
     my $command_disconnect_flap = "delete protocols dot1x authenticator interface $port mac-radius flap-on-disconnect";
 
     my @output;
@@ -343,11 +345,12 @@ sub enableMABFloatingDevice{
 
 }
 
-=item disableMABFloatingDevice
+=head2 disableMABFloatingDevice
 
 Connects to the switch and removes the RADIUS floating device configuration
 
 =cut
+
 sub disableMABFloatingDevice{
     my ($this, $ifIndex) = @_; 
     my $logger = Log::Log4perl::get_logger( ref($this) );
@@ -406,7 +409,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -48,11 +48,11 @@ BEGIN {
 }
 
 use pf::authentication;
+use pf::constants;
 use pf::config;
 use pf::enforcement qw(reevaluate_access);
-use pf::iplog qw(ip2mac);
+use pf::iplog;
 use pf::node qw(node_attributes node_modify node_register node_view is_max_reg_nodes_reached);
-use pf::os qw(dhcp_fingerprint_view);
 use pf::person qw(person_nodes);
 use pf::useragent;
 use pf::util;
@@ -761,7 +761,7 @@ Minor parts of this file may have been contributed. See CREDITS.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 Copyright (C) 2005 Kevin Amorin
 

@@ -7,6 +7,7 @@ use HTML::Entities;
 use pf::enforcement qw(reevaluate_access);
 use pf::config;
 use pf::log;
+use pf::fingerbank;
 use pf::util;
 use pf::Portal::Session;
 use pf::web;
@@ -16,7 +17,6 @@ use pf::violation;
 use pf::class;
 use Cache::FileCache;
 use pf::activation;
-use pf::os;
 use List::MoreUtils qw(any);
 use List::Util qw(first);
 use pf::factory::provisioner;
@@ -55,6 +55,7 @@ sub index : Path : Args(0) {
     my ( $self, $c ) = @_;
     $c->forward('validateMac');
     $c->forward('nodeRecordUserAgent');
+    $c->forward('processFingerbank');
     $c->forward('checkForViolation');
     $c->forward('checkIfNeedsToRegister');
     $c->forward('checkIfPending');
@@ -115,6 +116,28 @@ sub nodeRecordUserAgent : Private {
     return pf::useragent::process_useragent( $mac, $user_agent );
 }
 
+=head2 processFingerbank
+
+=cut
+
+sub processFingerbank :Private {
+    my ( $self, $c ) = @_;
+
+    my $portalSession   = $c->portalSession;
+    my $mac             = $portalSession->clientMac;
+    my $user_agent      = $c->request->user_agent;
+    my $node_attributes = node_attributes($mac);
+
+    my %fingerbank_query_args = (
+        user_agent          => $user_agent,
+        mac                 => $mac,
+        dhcp_fingerprint    => $node_attributes->{'dhcp_fingerprint'},
+        dhcp_vendor         => $node_attributes->{'dhcp_vendor'},
+    );
+
+    pf::fingerbank::process(\%fingerbank_query_args);
+}
+
 =head2 checkForViolation
 
 TODO: documention
@@ -135,7 +158,7 @@ sub checkForViolation : Private {
         # There is a violation, redirect the user
         # FIXME: there is not enough validation below
         my $vid      = $violation->{'vid'};
-        my $SCAN_VID = 12003;
+        my $SCAN_VID = 1200001;
 
         # detect if a system scan is in progress, if so redirect to scan in progress page
         if (   $vid == $SCAN_VID
@@ -143,7 +166,7 @@ sub checkForViolation : Private {
             =~ /^Scan in progress, started at: (.*)$/ ) {
             $logger->info(
                 "[$mac] captive portal redirect to the scan in progress page");
-            $c->detach( 'scan_status', [$1] );
+            $c->detach( 'Remediation', 'scan_status', [$1] );
         }
         my $class    = class_view($vid);
         my $template = $class->{'template'};
@@ -210,22 +233,21 @@ sub checkIfNeedsToRegister : Private {
     $c->stash(unreg => $unreg,);
     if ($unreg && isenabled($Config{'trapping'}{'registration'})) {
 
-        $logger->info("[$mac] redirected to ".$profile->name);
         # Redirect to the billing engine if enabled
         if (isenabled($portalSession->profile->getBillingEngine)) {
-            $logger->info("[$mac] redirected to billing page");
+            $logger->info("[$mac] redirected to billing page on ".$profile->name." portal");
             $c->detach('Pay' => 'index');
         } elsif ( $profile->nbregpages > 0 ) {
             $logger->info(
-                "[$mac] redirected to multi-page registration process");
+                "[$mac] redirected to multi-page registration process on ".$profile->name." portal");
             $c->detach('Authenticate', 'next_page');
         } elsif ($portalSession->profile->guestRegistrationOnly) {
 
             # Redirect to the guests self registration page if configured to do so
-            $logger->info("[$mac] redirected to guests self registration page");
+            $logger->info("[$mac] redirected to guests self registration page on ".$profile->name." portal");
             $c->detach('Signup' => 'index');
         } else {
-            $logger->info("[$mac] redirected to authentication page");
+            $logger->info("[$mac] redirected to authentication page on ".$profile->name." portal");
             $c->detach('Authenticate', 'index');
         }
     }
@@ -261,7 +283,6 @@ sub checkIfPending : Private {
             }
         }
         if ( pf::activation::activation_has_entry($mac,'sms') ) {
-            node_deregister($mac);
             $c->stash(
                 template => 'guest/sms_confirmation.html',
                 post_uri => '/activate/sms'
@@ -273,7 +294,7 @@ sub checkIfPending : Private {
                   . $Config{'general'}{'hostname'} . "."
                   . $Config{'general'}{'domain'}
                   . '/captive-portal?destination_url='
-                  . uri_escape( $portalSession->_build_destinationUrl ) );
+                  . uri_escape( $portalSession->destinationUrl ) );
         } else {
             $c->stash(
                 template => 'pending.html',
@@ -284,6 +305,7 @@ sub checkIfPending : Private {
                 redirect_url => $Config{'trapping'}{'redirecturl'},
                 initial_delay =>
                   $CAPTIVE_PORTAL{'NET_DETECT_PENDING_INITIAL_DELAY'},
+                image_path => $Config{'captive_portal'}{'image_path'},
             );
 
             # override destination_url if we enabled the always_use_redirecturl option
@@ -333,17 +355,18 @@ sub unknownState : Private {
         );
         my $node = node_view($mac);
         my $switch;
-        if( pf::SwitchFactory->hasId($node->{last_switch}) ){
-            $switch = pf::SwitchFactory->getInstance()->instantiate($node->{last_switch});
+        my $last_switch_id = $node->{last_switch};
+        if( defined $last_switch_id ) {
+            $switch = pf::SwitchFactory->instantiate($last_switch_id);
         }
 
-        if(defined($switch) && $switch->supportsWebFormRegistration){
+        if(defined($switch) && $switch && $switch->supportsWebFormRegistration){
             $logger->info("(" . $switch->{_id} . ") supports web form release. Will use this method to authenticate [$mac]");
             $c->stash(
                 template => 'webFormRelease.html',
-                content => $switch->getAcceptForm($mac, 
-                                $c->stash->{destination_url}, 
-                                new pf::Portal::Session()->session, 
+                content => $switch->getAcceptForm($mac,
+                                $c->stash->{destination_url},
+                                new pf::Portal::Session()->session,
                                 ),
             );
             $c->detach;
@@ -437,20 +460,21 @@ sub webNodeRegister : Private {
     node_register( $mac, $pid, %info );
 
     my $provisioner = $c->profile->findProvisioner($mac);
-    unless ( (defined($provisioner) && $provisioner->skipDeAuth) || $c->user_cache->get("mac:$mac:do_not_deauth") ) {
+    unless ( (defined($provisioner) && $provisioner->skipDeAuth) || $c->user_cache->get("do_not_deauth") ) {
         my $node = node_view($mac);
         my $switch;
-        if( pf::SwitchFactory->hasId($node->{last_switch}) ){
-            $switch = pf::SwitchFactory->getInstance()->instantiate($node->{last_switch});
+        my $last_switch_id = $node->{last_switch};
+        if( defined $last_switch_id ) {
+            $switch = pf::SwitchFactory->instantiate($last_switch_id);
         }
 
-        if(defined($switch) && $switch->supportsWebFormRegistration){
+        if(defined($switch) && $switch && $switch->supportsWebFormRegistration){
             $logger->info("Switch supports web form release.");
             $c->stash(
                 template => 'webFormRelease.html',
-                content => $switch->getAcceptForm($mac, 
-                                $c->stash->{destination_url}, 
-                                new pf::Portal::Session()->session, 
+                content => $switch->getAcceptForm($mac,
+                                $c->stash->{destination_url},
+                                new pf::Portal::Session()->session,
                                 ),
             );
             $c->detach;
@@ -498,7 +522,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

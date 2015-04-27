@@ -15,19 +15,21 @@ set -e
 
 stop_service_if_exists() {
     SERVICE=$1
-    if [ $(set +e;invoke-rc.d --quiet --query packetfence stop; echo $?) = 104  ];then
-        invoke-rc.d packetfence stop
+    NUM=`set +e;invoke-rc.d --quiet --query $SERVICE stop;echo $?`
+    if [ $NUM -eq 104 ]; then
+        invoke-rc.d $SERVICE stop
     fi
 }
 
 case "$1" in
     install)
         if [ -z "$(getent passwd pf)" ]; then
-                useradd -r -d "/usr/local/pf" -s /bin/sh -c "PacketFence" -M pf
+                useradd -U -r -d "/usr/local/pf" -s /bin/sh -c "PacketFence" -M pf
                 echo "create pf user"
         else
                 echo "pf user already exist"
         fi
+        usermod -G fingerbank pf
         if [ -e /etc/lsb-release ]; then
             usermod -a -G pf dhcpd
         fi
@@ -42,6 +44,9 @@ case "$1" in
         fi
         if [ -d "/usr/local/pf/var/cache" ] ; then
                 rm -fr /usr/local/pf/var/cache/
+        fi
+        if [ -a "/usr/local/pf/html/pfappserver/lib/pfappserver/Controller/Config/Fingerprints.pm" ] ; then
+                rm -fr /usr/local/pf/html/pfappserver/lib/pfappserver/Controller/Config/Fingerprints.pm
         fi
         exit 0
     ;;

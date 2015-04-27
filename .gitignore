@@ -25,7 +25,8 @@ db/pf-schema.sql
 raddb/eap.conf
 raddb/radiusd.conf
 raddb/sql.conf
-conf/templates/*
+raddb/proxy.conf.inc
+raddb/clients.conf.inc
 conf/adminroles.conf
 conf/authentication.conf
 conf/floating_network_device.conf
@@ -37,6 +38,10 @@ conf/networks.conf
 conf/radiusd/eap.conf
 conf/radiusd/radiusd.conf
 conf/radiusd/sql.conf
+conf/radiusd/proxy.conf.inc
+conf/radiusd/clients.conf.inc
+conf/radiusd/packetfence-cluster
+conf/realm.conf
 conf/snort/classification.config
 conf/snort/local.rules
 conf/snort/reference.config
@@ -60,7 +65,23 @@ conf/vlan_filters.conf
 html/captive-portal/captive_portal.conf
 conf/pfdetect_remote.conf
 conf/pfarp_remote.conf
+conf/pfconfig.conf
 conf/allowed-gaming-oui.txt
+conf/cluster.conf
+conf/domain.conf
+conf/haproxy.conf
+conf/keepalived.conf
+conf/templates/emails-billing_confirmation.txt.tt
+conf/templates/emails-guest_admin_pregistration.txt.tt
+conf/templates/emails-guest_email_activation.txt.tt
+conf/templates/emails-guest_email_preregistration.txt.tt
+conf/templates/emails-guest_email_preregistration_confirmed.txt.tt
+conf/templates/emails-guest_local_account_creation.txt.tt
+conf/templates/emails-guest_registered.txt.tt
+conf/templates/emails-guest_sponsor_activation.txt.tt
+conf/templates/emails-guest_sponsor_confirmed.txt.tt
+conf/templates/emails-guest_sponsor_preregistration.txt.tt
+html/pfappserver/pfappserver.conf
 
 
 # translations
@@ -81,6 +102,7 @@ html/admin/traplog/
 
 # built by package or installer
 lib/pf/pfcmd/pfcmd_pregrammar.pm
+lib/fingerbank
 
 # directories that can be ignored
 logs/

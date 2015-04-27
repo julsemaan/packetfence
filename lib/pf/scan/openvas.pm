@@ -21,6 +21,7 @@ use Readonly;
 
 use base ('pf::scan');
 
+use pf::constants;
 use pf::config;
 use pf::util;
 
@@ -380,7 +381,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

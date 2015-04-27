@@ -32,6 +32,7 @@ my $logger = Log::Log4perl->get_logger( "dao/person.t" );
 Log::Log4perl::MDC->put( 'proc', "dao/person.t" );
 Log::Log4perl::MDC->put( 'tid',  0 );
 
+use pf::constants;
 use pf::config;
 use lib qw(/usr/local/pf/t);
 use TestUtils;
@@ -178,7 +179,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -16,12 +16,13 @@ Util functions for pf services
 use strict;
 use warnings;
 use base qw(Exporter);
-our @EXPORT = qw(daemonize createpid);
+our @EXPORT = qw(daemonize createpid deletepid);
 use pf::log;
 use pf::log::trapper;
 use pf::file_paths;
 use Log::Log4perl::Level;
 use File::Basename qw(basename);
+use Fcntl qw(:flock);
 
 
 =head2 daemonize
@@ -75,6 +76,15 @@ sub createpid {
     }
 }
 
+sub deletepid {
+    my ($pname) = @_;
+    $pname = basename($0) if ( !$pname );
+    my $pidfile = $var_dir . "/run/$pname.pid";
+    unlink($pidfile) || return (-1);
+    return (1);
+}
+
+
 
 =head1 AUTHOR
 
@@ -82,11 +92,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

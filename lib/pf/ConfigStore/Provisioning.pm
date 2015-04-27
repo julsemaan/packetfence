@@ -20,6 +20,8 @@ extends 'pf::ConfigStore';
 
 sub configFile { $pf::file_paths::provisioning_config_file };
 
+sub pfconfigNamespace {'config::Provisioning'}
+
 =head2 cleanupAfterRead
 
 Clean up switch data
@@ -59,11 +61,11 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and::or
+This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.

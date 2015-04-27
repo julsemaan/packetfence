@@ -26,6 +26,9 @@
   <IfModule !mod_apreq2.c>
     LoadModule apreq_module /usr/lib/apache2/modules/mod_apreq2.so
   </IfModule>
+  <IfModule !mod_headers.c>
+    LoadModule headers_module /usr/lib/apache2/modules/mod_headers.so
+  </IfModule>
 </IfDefine>
 
 #RHEL specific
@@ -54,13 +57,17 @@
   <IfModule !mod_apreq2.c>
     LoadModule apreq_module modules/mod_apreq2.so
   </IfModule>
+  <IfModule !mod_headers.c>
+    LoadModule headers_module modules/mod_headers.so
+  </IfModule>
 </IfDefine>
 
 AcceptMutex posixsem
 
 PerlSwitches -I/usr/local/pf/lib
 PerlSwitches -I/usr/local/pf/html/pfappserver/lib
-PerlLoadModule pfappserver;
+PerlLoadModule pfappserver
+PerlLoadModule pf::WebAPI::InitHandler
 
 <Perl>
 BEGIN {
@@ -68,8 +75,11 @@ BEGIN {
 }
 
 use pf::config qw();
+use pf::cluster qw();
 
 my $PfConfig = \%pf::config::Config;
+my $cluster_enabled = $pf::cluster::cluster_enabled;
+my $ConfigCluster = \%pf::cluster::ConfigCluster;
 my $management_network = $pf::config::management_network;
 my $install_dir = $pf::config::install_dir;
 my $var_dir = $pf::config::var_dir;
@@ -79,21 +89,31 @@ $PidFile = $install_dir.'/var/run/httpd.admin.pid';
 
 $Include = $install_dir.'/conf/httpd.conf.d/log.conf';
 
+$PerlChildInitHandler = "pf::WebAPI::InitHandler::child_init";
+
 if (defined($management_network->{'Tip'}) && $management_network->{'Tip'} ne '') {
     if (defined($management_network->{'Tvip'}) && $management_network->{'Tvip'} ne '') {
-        $Listen = $management_network->{'Tvip'}.":".$PfConfig->{'ports'}{'admin'};
-        $vhost = $management_network->{'Tvip'}.":".$PfConfig->{'ports'}{'admin'};
+        push (@Listen, $management_network->{'Tvip'}.":".$PfConfig->{'ports'}{'admin'});
+        push (@Listen, $management_network->{'Tvip'}.":".$PfConfig->{'ports'}{'pf_status'});
+        $vhost = $management_network->{'Tvip'};
+    } elsif ( $cluster_enabled ){
+        push (@Listen, $ConfigCluster->{'CLUSTER'}{'management_ip'}.":".$PfConfig->{'ports'}{'admin'}); 
+        push (@Listen, $ConfigCluster->{'CLUSTER'}{'management_ip'}.":".$PfConfig->{'ports'}{'pf_status'}); 
+        $vhost = $ConfigCluster->{'CLUSTER'}{'management_ip'};
     } else {
-        $Listen = $management_network->{'Tip'}.":".$PfConfig->{'ports'}{'admin'};
-        $vhost = $management_network->{'Tip'}.":".$PfConfig->{'ports'}{'admin'};
+        push (@Listen, $management_network->{'Tip'}.":".$PfConfig->{'ports'}{'admin'});
+        push (@Listen, $management_network->{'Tip'}.":".$PfConfig->{'ports'}{'pf_status'});
+        $vhost = $management_network->{'Tip'};
    }
 } else {
-    $Listen = "0.0.0.0:".$PfConfig->{'ports'}{'admin'};
-    $vhost = "0.0.0.0:".$PfConfig->{'ports'}{'admin'};
+    push (@Listen, "0.0.0.0:".$PfConfig->{'ports'}{'admin'});
+    push (@Listen, "0.0.0.0:".$PfConfig->{'ports'}{'pf_status'});
+    $vhost = "0.0.0.0";
 }
 
 $User = "pf";
 $Group = "pf";
+
 
 $TypesConfig = '/etc/mime.types';
 
@@ -123,14 +143,16 @@ $SSLRandomSeed = "startup builtin";
 $SSLRandomSeed = "startup file:/dev/urandom 1024";
 $SSLRandomSeed = "connect builtin";
 $SSLRandomSeed = "connect file:/dev/urandom 1024";
-$SSLProtocol = "All -SSLv2";
-$SSLCipherSuite = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-RSA-RC4-SHA:ECDHE-ECDSA-RC4-SHA:AES128:AES256:RC4-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK";
+$SSLProtocol = "All -SSLv2 -SSLv3";
+$SSLCipherSuite = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA";
 $SSLHonorCipherOrder = "on";
 
 $ErrorLog = $install_dir.'/logs/httpd.admin.error';
 
-$NameVirtualHost => $vhost;
-push @{ $VirtualHost{$vhost} },
+push (@NameVirtualHost,$vhost.":".$PfConfig->{'ports'}{'admin'});
+push (@NameVirtualHost,$vhost.":".$PfConfig->{'ports'}{'pf_status'});
+
+push @{ $VirtualHost{$vhost.":".$PfConfig->{'ports'}{'admin'}} },
     {
          ServerName   => $PfConfig->{'general'}{'hostname'}.".".$PfConfig->{'general'}{'domain'},
          DocumentRoot => $install_dir.'/html/pfappserver/lib',
@@ -155,6 +177,16 @@ push @{ $VirtualHost{$vhost} },
                  SetHandler => 'default-handler',
              },
          },
+    };
+push @{ $VirtualHost{$vhost.":".$PfConfig->{'ports'}{'pf_status'}} },
+    {
+         ServerName   => $PfConfig->{'general'}{'hostname'}.".".$PfConfig->{'general'}{'domain'},
+         DocumentRoot => $install_dir.'/html/pfappserver/lib',
+         ErrorLog     => $install_dir.'/logs/httpd.admin.error',
+         CustomLog    => $install_dir.'/logs/httpd.admin.access combined',
+         AllowEncodedSlashes => "on",
+         PerlModule        => 'pf::clustermgmt',
+         PerlTransHandler  => 'pf::clustermgmt',
     };
 
 </Perl>

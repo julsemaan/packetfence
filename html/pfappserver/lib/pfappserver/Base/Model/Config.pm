@@ -301,13 +301,14 @@ sub sortItems {
 sub commit {
     my ($self) = @_;
     my ($status,$status_msg);
-    if($self->configStore->commit()) {
+    my ($result,$error) = $self->configStore->commit();
+    if($result) {
         $status = HTTP_OK;
         $status_msg = "Changes successfully commited";
     }
     else {
         $status = HTTP_INTERNAL_SERVER_ERROR;
-        $status_msg = "Unable to commit changes to file please run pfcmd fixpermissions and try again";
+        $status_msg = "$error\n";
     }
     return ($status,$status_msg);
 }
@@ -341,7 +342,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

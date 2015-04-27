@@ -16,12 +16,13 @@ use HTTP::Status qw(:constants is_error is_success);
 use Moo;
 use namespace::autoclean;
 use pf::file_paths;
-use pf::admin_roles;
 extends 'pf::ConfigStore';
 
-sub expandableParams { return (qw(actions)); }
+sub expandableParams { return (qw(actions allowed_roles allowed_access_levels)); }
 
-sub _buildCachedConfig { $cached_adminroles_config }
+sub configFile { $admin_roles_config_file }
+
+sub pfconfigNamespace { 'config::AdminRoles' }
 
 =head2 cleanupAfterRead
 
@@ -51,7 +52,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

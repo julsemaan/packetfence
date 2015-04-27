@@ -80,12 +80,6 @@ tools/stinger.exe=http://download.nai.com/products/mcafee-avert/stng260.exe
 
 [trapping]
 #
-# trapping.range
-#
-# Comma-delimited list of address ranges/CIDR blocks that PacketFence will monitor/detect/trap on.  Gateway, network, and 
-# broadcast addresses are ignored.
-range=192.168.0.0/24
-#
 # trapping.registration
 #
 # If enabled, nodes will be required to register on first network access.  Further registration options are configured in the 
@@ -125,6 +119,12 @@ detection=disabled
 # Let you choose from our supported IDS: snort or suricata
 #
 detection_engine=snort
+#
+# trapping.range
+#
+# Comma-delimited list of address ranges/CIDR blocks that Snort/Suricata will monitor/detect/trap on.  Gateway, network, and 
+# broadcast addresses are ignored.
+range=192.168.0.0/24
 
 #
 # trapping.wireless_ips
@@ -274,6 +274,11 @@ soap=9090
 #
 # Port of the aaa http interface listens on.
 aaa=7070
+#
+#port.pf_status
+#
+# Port of the packetfence status http interface listends on.
+pf_status=9191
 
 [scan]
 #
@@ -420,6 +425,11 @@ httpd_portal=enabled
 #
 # Please note that this table should not become too big since it 
 httpd_admin=enabled
+#
+# expire.ldap_auth
+#
+# Enable expiration of the ldap_auth cache
+ldap_auth=enabled
 
 [services]
 #
@@ -427,6 +437,11 @@ httpd_admin=enabled
 #
 # Should DHCPd be managed by PacketFence?
 dhcpd=enabled
+#
+# services.haproxy
+#
+# Should haproxy be started?
+haproxy=enabled
 #
 # services.pfdns
 #
@@ -513,6 +528,11 @@ pfmon=enabled
 # Should pfdhcplistener be started?
 pfdhcplistener=enabled
 #
+# services.keepalived
+#
+# Should keepalived be started?
+keepalived=enabled
+#
 # services.snort_binary
 #
 # Location of the snort binary. Only necessary to change if you are not running the RPMed version. 
@@ -522,6 +542,11 @@ snort_binary=/usr/sbin/snort
 # 
 # Location of the suricata binary.
 suricata_binary=/usr/bin/suricata
+#
+# services.haproxy_binary
+#
+# Location of the haproxy binary. Only necessary to change if you are not running the RPMed version.
+haproxy_binary=/usr/sbin/haproxy
 #
 # services.httpd_binary
 #
@@ -557,6 +582,11 @@ iptables_binary=/sbin/iptables
 # 
 # Location of the memcached binary. Only necessary to change if you are not running the pre-packaged version.
 memcached_binary=/usr/bin/memcached
+#
+# services.keepalived_binary
+#
+# Location of the keepalived binary. Only necessary to change if you are not running the RPMed version.
+keepalived_binary=/usr/sbin/keepalived
 # 
 # services.memcached_memory_usage
 # 
@@ -702,6 +732,12 @@ network_detection=enabled
 #
 network_detection_ip = 192.95.20.194
 #
+# captive_portal.image_path
+#
+# This is the path where the gif is on the webserver to detect if the network access
+# has been enabled.
+image_path = /common/network-access-detection.gif
+#
 # captive_portal.loadbalancers_ip
 #
 # If the captive portal is put behind load-balancer(s) that act at Layer 7 
@@ -723,6 +759,12 @@ loadbalancers_ip=
 # If secure_redirect is enabled, the captive portal uses HTTPS when redirecting
 # captured clients. This is the default behavior.
 secure_redirect=enabled
+#
+# captive_portal.status_only_on_production
+#
+# If status_only_on_production is enabled, the /status page will only be available on the
+# production network. This is disabled by default
+status_only_on_production=disabled
 
 [advanced]
 #
@@ -745,6 +787,50 @@ pfcmd_warning_color=yellow
 #
 # Color of the success text for pfcmd
 pfcmd_success_color=green
+#
+# advanced.hash_passwords
+#
+# The algorithm to use to hash the passwords in the local database.
+hash_passwords=bcrypt
+
+#
+# advanced.hashing_cost
+#
+# The cost factor to apply to the password hashing if applicable.
+# Currently only applies to bcrypt.
+hashing_cost=8
+
+[omapi]
+#
+# omapi.ip2mac_lookup
+#
+# Use OMAPI to query DHCPd for the MAC address of a given IP address
+ip2mac_lookup=enabled
+#
+# omapi.mac2ip_lookup
+#
+# Use OMAPI to query DHCPd for the IP address of a given MAC address
+mac2ip_lookup=enabled
+#
+# omapi.key_name
+#
+# The OMAPI key name for signing messages
+key_name=pf_omapi_key
+#
+# omapi.key_base64
+#
+# The OMAPI base64 key for signing messages
+key_base64=
+#
+# omapi.port
+#
+# The OMAPI port number
+port=7911
+#
+# omapi.host
+#
+# The OMAPI host
+host=localhost
 
 [provisioning]
 #
@@ -808,7 +894,7 @@ mirapay_hash_password =
 # node_import.pid
 #
 # Default pid value to assign to imported nodes.
-pid=admin
+pid=default
 #
 # node_import.category
 #
@@ -859,10 +945,30 @@ aaa_port=7070
 # iplog cleanup interval
 iplog_cleanup_interval=60s
 #
+# maintenance.iplog_cleanup_batch
+#
+# iplog cleanup batch
+iplog_cleanup_batch=100
+#
+# maintenance.iplog_cleanup_timeout
+#
+# iplog cleanup timeout
+iplog_cleanup_timeout=10s
+#
 # maintenance.node_cleanup_interval
 #
 # locationlog cleanup interval
 locationlog_cleanup_interval=60s
+#
+# maintenance.locationlog_cleanup_batch
+#
+# locationlog cleanup batch
+locationlog_cleanup_batch=100
+#
+# maintenance.locationlog_cleanup_timeout
+#
+# locationlog cleanup timeout
+locationlog_cleanup_timeout=10s
 #
 # maintenance.node_cleanup_interval
 #
@@ -913,4 +1019,36 @@ inline_accounting_maintenance_interval=60s
 #
 # acct maintenance interval
 acct_maintenance_interval=60s
+#
+# maintenance.provisioning_compliance_poll_interval
+#
+# Interval at which Packetfence runs the polling enforcement on the provisioners
+provisioning_compliance_poll_interval=300s
+#
+# maintenance.ldap_auth_cache_cleanup_interval
+#
+# Interval at which Packetfence purges the ldap_auth cache
+ldap_auth_cache_cleanup_interval=600s
+
+[active_active]
+#
+# active_active.password
+#
+# Shared KEY for vrrp protocol (Must be the same on all members).
+password=1234
+#
+# active_active.virtual_router_id
+#
+# Shared KEY for vrrp protocol (Must be the same on all members).
+virtual_router_id=50
+
+[monitoring]
+#
+# monitoring.statsd_host
+#
+statsd_host=localhost
+#
+# monitoring.statsd_port
+#
+statsd_port=8125
 

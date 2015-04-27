@@ -17,6 +17,10 @@ set -e
 # for details, see http://www.debian.org/doc/debian-policy/ or
 # the debian-policy package
 
+# Force the LC_CTYPE to C to avoid i18n problems during postinstallation.
+LC_CTYPE=C
+export LC_CTYPE
+
 
 case "$1" in
     configure)
@@ -37,6 +41,11 @@ case "$1" in
 
         chown pf:pf $PACKETFENCE
         find $PACKETFENCE '(' -type d -or -type f ')' -not -name pfcmd -print0 | xargs -0 chown pf:pf
+        if [ -e /etc/lsb-release ]; then
+            chown dhcpd:dhcpd $PACKETFENCE/var/dhcpd/dhcpd.leases
+        else
+            chown root:root $PACKETFENCE/var/dhcpd/dhcpd.leases
+        fi
 
         # link to latest SQL schema
         if [ ! -e "$PACKETFENCE/db/pf-schema.sql" ]; then
@@ -60,14 +69,23 @@ case "$1" in
             -out /usr/local/pf/conf/ssl/server.crt\
             -keyout /usr/local/pf/conf/ssl/server.key\
             -nodes -config /usr/local/pf/conf/openssl.cnf
+            cat /usr/local/pf/conf/ssl/server.crt /usr/local/pf/conf/ssl/server.key > /usr/local/pf/conf/ssl/server.pem
         fi
 
 	if [ ! -f /usr/local/pf/raddb/certs/dh ]; then
-	    echo "Bulding default RADIUS certificates..."
+	    echo "Building default RADIUS certificates..."
 	    cd /usr/local/pf/raddb/certs
 	    make dh 
 	else
 	    echo "DH already exists, won't touch it!"
+        fi
+
+        if [ ! -f /usr/local/pf/conf/pf.conf ]; then
+            echo "pf.conf doesnt exits"
+            touch /usr/local/pf/conf/pf.conf
+            chown pf.pf /usr/local/pf/conf/pf.conf
+        else
+            echo "pf.conf already exists, won't touch it!"
         fi
 
         # managing services
@@ -98,7 +116,6 @@ case "$1" in
         if ! ( grep '^Defaults:pf.*!requiretty' /etc/sudoers > /dev/null ) ; then
             echo 'Defaults:pf !requiretty' >> /etc/sudoers
         fi
-        /usr/local/pf/bin/pfcmd configreload
         update-rc.d packetfence defaults 60 || exit 0
         echo "* Please fire up your Web browser and go to https://@ip_packetfence:1443/configurator to complete your PacketFence configuration."
         echo "* Please stop your iptables service if you don't have access to configurator."

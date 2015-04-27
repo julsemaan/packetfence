@@ -144,8 +144,10 @@ TypesConfig /etc/mime.types
 BEGIN {
     use pf::log 'service' => 'httpd.portal';
 }
-use pf::config qw();
+use pf::config qw(); 
+use pf::constants::config;
 use pf::util qw(isenabled);
+use pf::config::util;
 use pf::authentication();
 use pf::web::constants();
 use Tie::DxHash;
@@ -175,6 +177,7 @@ $Include = $install_dir.'/conf/httpd.conf.d/log.conf';
 $User = "pf";
 $Group = "pf";
 
+
 $PerlOptions = "+GlobalRequest";
 $ProxyRequests = "Off";
 
@@ -203,6 +206,7 @@ if( pf::config::isenabled ($PfConfig->{services}{httpd_mod_qos})) {
 $HostnameLookups = "off";
 $MaxRequestsPerChild = "1000";
 $PerlInitHandler = "pf::WebAPI::InitHandler";
+$PerlChildInitHandler = "pf::WebAPI::InitHandler::child_init";
 
 
 $SSLPassPhraseDialog = "builtin";
@@ -212,15 +216,31 @@ $SSLRandomSeed = "startup builtin";
 $SSLRandomSeed = "startup file:/dev/urandom 1024";
 $SSLRandomSeed = "connect builtin";
 $SSLRandomSeed = "connect file:/dev/urandom 1024";
-$SSLProtocol = "All -SSLv2";
-$SSLCipherSuite = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-RSA-RC4-SHA:ECDHE-ECDSA-RC4-SHA:AES128:AES256:RC4-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK";
+$SSLProtocol = "All -SSLv2 -SSLv3";
+$SSLCipherSuite = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA";
 $SSLHonorCipherOrder = "on";
 
 $ErrorLog = $install_dir.'/logs/portal_error_log';
 
-my $routedNets = join(" ", pf::util::get_routed_isolation_nets(), pf::util::get_routed_registration_nets() , pf::util::get_inline_nets());
+my $routedNets = join(" ", pf::config::util::get_routed_isolation_nets(), pf::config::util::get_routed_registration_nets() , pf::config::util::get_inline_nets());
 my $loadbalancersIp = join(" ", keys %{$pf::config::CAPTIVE_PORTAL{'loadbalancers_ip'}});
-my $allowed_from_all_urls = "|$WEB::URL_STATUS";
+my $status_only_on_production = pf::config::isenabled ($PfConfig->{captive_portal}{status_only_on_production});
+my $allowed_from_all_urls = '';
+my @status_options;
+if($status_only_on_production) {
+    @status_options = (
+        '~ "/status"' => {
+            "Order"             => "allow,deny",
+            "Deny"              => "from $routedNets $loadbalancersIp 127.0.0.1 ",
+            "Allow"             => "from all",
+            SetHandler          => 'modperl',
+            PerlResponseHandler => 'captiveportal',
+        },
+    );
+}
+else {
+    $allowed_from_all_urls = "|$WEB::URL_STATUS";
+}
 # signup and preregister if pre-registration is allowed
 my $guest_regist_allowed = scalar keys %pf::authentication::guest_self_registration;
 if ($guest_regist_allowed && isenabled($pf::config::Config{'guests_self_registration'}{'preregistration'})) {
@@ -228,11 +248,21 @@ if ($guest_regist_allowed && isenabled($pf::config::Config{'guests_self_registra
     $allowed_from_all_urls .= "|$WEB::URL_SIGNUP|$WEB::CGI_SIGNUP|$WEB::URL_PREREGISTER";
 }
 # /activate/email allowed if sponsor or email mode enabled
-my $email_enabled = $pf::authentication::guest_self_registration{$SELFREG_MODE_EMAIL};
-my $sponsor_enabled = $pf::authentication::guest_self_registration{$SELFREG_MODE_SPONSOR};
+my $email_enabled = $pf::authentication::guest_self_registration{$pf::constants::config::SELFREG_MODE_EMAIL};
+my $sponsor_enabled = $pf::authentication::guest_self_registration{$pf::constants::config::SELFREG_MODE_SPONSOR};
 if ($guest_regist_allowed && ($email_enabled || $sponsor_enabled)) {
     # | is for a regexp "or" as this is pulled from a 'Location ~' statement
     $allowed_from_all_urls .= "|$WEB::URL_EMAIL_ACTIVATION";
+}
+my @allowed_from_all_options;
+if ($allowed_from_all_urls) {
+    @allowed_from_all_options = (
+        "~ \"/$allowed_from_all_urls\"" => {
+            "Allow"             => "from all",
+            SetHandler          => 'modperl',
+            PerlResponseHandler => 'captiveportal',
+        },
+    );
 }
 
 foreach my $interface (@internal_nets) {
@@ -258,7 +288,7 @@ foreach my $interface (@internal_nets) {
          Alias        => "/common ${install_dir}/html/common",
          PerlModule   => 'captiveportal',
          PerlTransHandler => 'pf::web::dispatcher::custom',
-         Location     => {
+         Location     => gen_conf(
              "/" => {
                  "Order" => "deny,allow",
                  "Deny" => "from all",
@@ -287,12 +317,9 @@ foreach my $interface (@internal_nets) {
              "/content" => {
                 "Allow" => "from all",
              },
-             "~ \"/$allowed_from_all_urls\"" => {
-                "Allow" => "from all",
-                 SetHandler => 'modperl',
-                 PerlResponseHandler => 'captiveportal',
-             },
-         },
+             @status_options,
+             @allowed_from_all_options,
+         ),
     ));
     push (@{ $VirtualHost{$vhost.":443"} }, gen_conf(
          ServerName   => $PfConfig->{'general'}{'hostname'}.".".$PfConfig->{'general'}{'domain'},
@@ -305,7 +332,7 @@ foreach my $interface (@internal_nets) {
          Alias        => "/common ${install_dir}/html/common",
          PerlModule   => 'captiveportal',
          PerlTransHandler => 'pf::web::dispatcher::custom',
-         Location     => {
+         Location     => gen_conf(
              "/" => {
                  "Order" => "deny,allow",
                  "Deny" => "from all",
@@ -334,15 +361,12 @@ foreach my $interface (@internal_nets) {
              "/content" => {
                 "Allow" => "from all",
              },
-             "~ \"/$allowed_from_all_urls\"" => {
-                "Allow" => "from all",
-                 SetHandler => 'modperl',
-                 PerlResponseHandler => 'captiveportal',
-             },
-         },
-         SSLEngine => 'on',
+             @status_options,
+             @allowed_from_all_options,
+         ),
+         SSLEngine         => 'on',
          SSLProxyEngine    => 'on',
-         Include      => "${var_dir}/conf/ssl-certificates.conf",
+         Include           => "${var_dir}/conf/ssl-certificates.conf",
     ));
 }
 
@@ -369,7 +393,7 @@ if (defined($management_network->{'Tip'}) && $management_network->{'Tip'} ne '')
          Alias        => "/common ${install_dir}/html/common",
          PerlModule   => 'captiveportal',
          PerlTransHandler => 'pf::web::dispatcher::custom',
-         Location     => {
+         Location     => gen_conf(
              "/" => {
                  "Order" => "deny,allow",
                  "Deny" => "from all",
@@ -398,15 +422,16 @@ if (defined($management_network->{'Tip'}) && $management_network->{'Tip'} ne '')
              "/content" => {
                 "Allow" => "from all",
              },
-             "~ \"/$allowed_from_all_urls\"" => {
-                "Allow" => "from all",
-                 SetHandler => 'modperl',
-                 PerlResponseHandler => 'captiveportal',
-             }, 
+             '~ "/|/status"' => {
+                "Allow"             => "from all",
+                SetHandler          => 'modperl',
+                PerlResponseHandler => 'captiveportal',
+             },
+             @allowed_from_all_options,
              "/apache_status/" => {
                  SetHandler => 'server-status',
              },
-         },
+         ),
     );
     push @{ $VirtualHost{$host.":443"} }, gen_conf(
          ServerName   => $PfConfig->{'general'}{'hostname'}.".".$PfConfig->{'general'}{'domain'},
@@ -419,7 +444,7 @@ if (defined($management_network->{'Tip'}) && $management_network->{'Tip'} ne '')
          Alias        => "/common ${install_dir}/html/common",
          PerlModule   => 'captiveportal',
          PerlTransHandler => 'pf::web::dispatcher::custom',
-         Location     => {
+         Location     => gen_conf(
              "/" => {
                  "Order" => "deny,allow",
                  "Deny" => "from all",
@@ -448,18 +473,18 @@ if (defined($management_network->{'Tip'}) && $management_network->{'Tip'} ne '')
              "/content" => {
                 "Allow" => "from all",
              },
-             "~ \"/$allowed_from_all_urls\"" => {
-                "Allow" => "from all",
-                 SetHandler => 'modperl',
-                 PerlResponseHandler => 'captiveportal',
+             '~ "/|/status"' => {
+                "Allow"             => "from all",
+                SetHandler          => 'modperl',
+                PerlResponseHandler => 'captiveportal',
              },
-         },
-         SSLEngine => 'on',
+             @allowed_from_all_options,
+         ),
+         SSLEngine         => 'on',
          SSLProxyEngine    => 'on',
-         Include      => "${var_dir}/conf/ssl-certificates.conf",
+         Include           => "${var_dir}/conf/ssl-certificates.conf",
     );
 
 } 
 
 </Perl>
-

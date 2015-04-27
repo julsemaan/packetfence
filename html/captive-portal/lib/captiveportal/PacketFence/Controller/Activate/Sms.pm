@@ -5,6 +5,7 @@ use Log::Log4perl;
 use POSIX;
 use URI::Escape::XS qw(uri_escape);
 
+use pf::constants;
 use pf::config;
 use pf::iplog;
 use pf::node;
@@ -50,14 +51,15 @@ sub index : Path : Args(0) {
         if ( $auth_return != 1 ) {
             $c->stash(
                 txt_auth_error => i18n_format( $GUEST::ERRORS{$err} ) );
+            utf8::decode($c->stash->{'txt_auth_error'});
             $c->detach('showSmsConfirmation');
         }
         my $profile = $c->profile;
         my %info;
         $logger->info("Valid PIN -- Registering user");
-        my $pid = $c->session->{"guest_pid"} || "admin";
+        my $pid = $c->session->{"guest_pid"} || "default";
         my $sms_type = pf::Authentication::Source::SMSSource->getDefaultOfType();
-        my $source = $profile->getSourceByType($sms_type);
+        my $source = $profile->getSourceByType($sms_type) || $profile->getSourceByTypeForChained($sms_type);
         my $auth_params = { 'username' => $pid, 'user_email' => $pid };
 
         if ($source) {
@@ -79,8 +81,8 @@ sub index : Path : Args(0) {
 
             $c->session->{"username"} = $pid;
             $c->session->{source_id} = $source->{id};
-            $c->stash->{info}=\%info; 
-            $c->stash->{sms_pin} = $request->param("pin");  # We are putting the SMS PIN in stash to use it as a password in case we create a local account
+            $c->stash->{info}=\%info;
+            $c->stash->{sms_pin} = $request->param_encoded("pin");  # We are putting the SMS PIN in stash to use it as a password in case we create a local account
             $c->forward('Authenticate' => 'postAuthentication');
             $c->forward('Authenticate' => 'createLocalAccount', [$auth_params]) if ( isenabled($source->{create_local_account}) );
             $c->forward('CaptivePortal' => 'webNodeRegister', [$pid, %{$c->stash->{info}}]);
@@ -119,22 +121,32 @@ sub showSmsConfirmation : Private {
 }
 
 sub sms_validation {
-    my ( $self, $c ) = @_;
-    my $logger = Log::Log4perl::get_logger(__PACKAGE__);
+    my ($self, $c) = @_;
+    my $logger = $c->log;
 
     # no form was submitted, assume first time
     my $pin = $c->request->param("pin");
     if ($pin) {
-        $c->log->info("Mobile phone number validation attempt");
-        if ( pf::activation::validate_code($pin) ) {
-            return ( $TRUE, 0 );
-        } else {
-            return ( $FALSE, $GUEST::ERROR_INVALID_PIN );
+        $logger->debug("Mobile phone number validation attempt");
+        my $portalSession = $c->portalSession;
+        if ($self->reached_retry_limit($c, 'sms_retries', $portalSession->profile->{_sms_pin_retry_limit})) {
+            my $mac = $portalSession->clientMac;
+            $logger->info("Max tries reached invalidating code for $mac");
+            pf::activation::invalidate_codes_for_mac($mac,'sms');
+            $c->stash(txt_validation_error => i18n_format($GUEST::ERRORS{$GUEST::ERROR_MAX_RETRIES}));
+            utf8::decode($c->stash->{'txt_auth_error'});
+            $c->detach(Signup => 'index');
         }
-    } else {
-
+        if (pf::activation::validate_code($pin)) {
+            return ($TRUE, 0);
+        }
+        else {
+            return ($FALSE, $GUEST::ERROR_INVALID_PIN);
+        }
+    }
+    else {
         # this won't display an error
-        return ( $FALSE, 0 );
+        return ($FALSE, 0);
     }
 }
 
@@ -144,7 +156,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -12,6 +12,7 @@ Form definition to create or update a htpasswd user source.
 
 use HTML::FormHandler::Moose;
 extends 'pfappserver::Form::Config::Authentication::Source';
+with 'pfappserver::Base::Form::Role::Help';
 
 # Form fields
 has_field 'path' =>
@@ -20,6 +21,16 @@ has_field 'path' =>
    label => 'File Path',
    required => 1,
    element_class => ['input-xxlarge'],
+  );
+has_field 'stripped_user_name' =>
+  (
+   type            => 'Toggle',
+   checkbox_value  => 'yes',
+   unchecked_value => 'no',
+   default         => 'yes',
+   label           => 'Use stripped username ',
+   tags => { after_element => \&help,
+             help => 'Use stripped username returned by RADIUS to test the following rules.' },
   );
 
 =head2 validate
@@ -40,7 +51,7 @@ sub validate {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

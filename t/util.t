@@ -8,11 +8,12 @@ BEGIN {
     use lib qw(/usr/local/pf/t);
     use PfFilePaths;
 }
-use Test::More tests => 29;
+use Test::More tests => 30;
 use Test::NoWarnings;
 
 BEGIN {
     use_ok('pf::util');
+    use_ok('pf::config::util');
     use_ok('pf::util::apache');
 }
 
@@ -89,7 +90,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
     

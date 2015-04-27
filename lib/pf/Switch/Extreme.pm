@@ -66,6 +66,7 @@ use Net::SNMP;
 use SOAP::Lite;
 use Try::Tiny;
 
+use pf::constants;
 use pf::config;
 # importing switch constants
 use pf::Switch::constants;
@@ -1520,7 +1521,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

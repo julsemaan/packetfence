@@ -45,12 +45,18 @@ sub instantiate {
     # and try to match a portal profile using the previously fetched filters.
     # If no match, we instantiate the default portal profile.
     my $node_info = node_view($mac) || {};
-    $node_info = { %$options, %$node_info } ;
+    $node_info = { %$node_info, %$options } ;
     my $filter = first { $_->match($node_info) } @Profile_Filters;
     my $profile_name = $filter ? $filter->profile : 'default';
     $logger->trace("Instantiate profile $profile_name");
     return $self->_from_profile($profile_name);
 }
+
+=head2 _from_profile
+
+Massages the profile values before creating the object
+
+=cut
 
 sub _from_profile {
     my ($self,$profile_name) = @_;
@@ -66,10 +72,17 @@ sub _from_profile {
         ];
     }
     $profile{guest_modes} = _guest_modes_from_sources($sources);
+    $profile{chained_guest_modes} = _chained_guest_modes_from_sources($sources);
     $profile{name} = $profile_name;
     $profile{template_path} = $profile_name;
     return pf::Portal::Profile->new( \%profile );
 }
+
+=head2 _guest_modes_from_sources
+
+Extract the guest modes from the sources
+
+=cut
 
 sub _guest_modes_from_sources {
     my ($sources) = @_;
@@ -87,13 +100,33 @@ sub _guest_modes_from_sources {
     return \@guest_modes;
 }
 
+
+=head2 _chained_guest_modes_from_sources
+
+Extract the guest modes from the chained sources
+
+=cut
+
+sub _chained_guest_modes_from_sources {
+    my ($sources) = @_;
+    $sources ||= [];
+    my %modeClasses = (
+        external  => undef,
+        exclusive => undef,
+    );
+    my %is_in = map { $_ => undef } @$sources;
+    my @modes = map { lc($_->getChainedAuthenticationSourceObject->type)} grep { exists $is_in{$_->id} && $_->type eq 'Chained'} @{pf::authentication::getAllAuthenticationSources()};
+
+    return \@modes;
+}
+
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

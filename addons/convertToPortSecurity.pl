@@ -97,15 +97,14 @@ Log::Log4perl->easy_init(
 );
 my $logger = Log::Log4perl->get_logger('');
 
-my $switchFactory = new pf::SwitchFactory( -configFile => CONF_FILE );
 
 my $OID_ifDesc = '1.3.6.1.2.1.2.2.1.2';
 
-if ( !exists( $switchFactory->config->{$switch_ip} ) ) {
+if ( !exists( pf::SwitchFactory->config->{$switch_ip} ) ) {
     $logger->logdie("switch $switch_ip not found in switch.conf");
 }
 
-my $switchType = $switchFactory->config->{$switch_ip}{'type'};
+my $switchType = pf::SwitchFactory->config->{$switch_ip}{'type'};
 if (!(  $switchType
         =~ /Cisco::Catalyst_29(50|60|70)|Cisco::Catalyst_35(50|60)/
     )
@@ -119,7 +118,7 @@ open $backup_fh, '>', "$backup_config"
     or $logger->logdie("can't open config backup file $backup_config");
 
 $logger->debug("instantiating switch object");
-my $switch = $switchFactory->instantiate($switch_ip);
+my $switch = pf::SwitchFactory->instantiate($switch_ip);
 if (!$switch) {
     $logger->logdie("Can not instantiate switch $switch_ip");
 }
@@ -399,7 +398,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

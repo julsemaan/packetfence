@@ -2,6 +2,7 @@ package captiveportal::PacketFence::Controller::Authenticate;
 
 use Moose;
 use namespace::autoclean;
+use pf::constants;
 use pf::config;
 use pf::web qw(i18n i18n_format);
 use pf::node;
@@ -78,7 +79,7 @@ sub modeToPath {
 
 sub default : Path {
     my ( $self, $c ) = @_;
-    $c->error("error: incorrect mode");
+    $self->showError($c,"error: incorrect mode");
 }
 
 sub next_page : Local : Args(0) {
@@ -125,7 +126,7 @@ sub next_page : Local : Args(0) {
 
         $c->stash->{template} = 'register.html';
     } else {
-        $c->error( "error: invalid page number" );
+        $self->showError($c,"error: invalid page number" );
     }
 }
 
@@ -140,7 +141,7 @@ sub deregister : Local : Args(0) {
         if ( $c->session->{username} eq $pid ) {
             pf::node::node_deregister($mac);
         } else {
-            $c->error( "error: access denied not owner" );
+            $self->showError($c,"error: access denied not owner" );
         }
     } else {
         $c->forward('login');
@@ -167,6 +168,7 @@ sub login : Local : Args(0) {
 
         # External authentication
         $c->forward('validateLogin');
+        $c->forward('enforceLoginRetryLimit');
         $c->forward('authenticationLogin');
         $c->forward('postAuthentication');
         $c->forward( 'CaptivePortal' => 'webNodeRegister', [$c->stash->{info}->{pid}, %{$c->stash->{info}}] );
@@ -176,6 +178,24 @@ sub login : Local : Args(0) {
     # Return login
     $c->forward('showLogin');
 
+}
+
+=head2 enforceLoginRetryLimit
+
+Limit the amount of time a user can retry a password
+
+=cut
+
+sub enforceLoginRetryLimit : Private {
+    my ($self, $c) = @_;
+    my $username = $c->request->param("username");
+    if ($username) {
+        if ($self->reached_retry_limit($c, "login_retries", $c->profile->{'_login_attempt_limit'})) {
+            $c->log->info("Max tries reached login code for $username");
+            $c->stash(txt_auth_error => i18n_format($GUEST::ERRORS{$GUEST::ERROR_MAX_RETRIES}));
+            $c->detach('showLogin');
+        }
+    }
 }
 
 =head2 postAuthentication
@@ -188,6 +208,7 @@ sub postAuthentication : Private {
     my ( $self, $c ) = @_;
     my $logger = $c->log;
     $c->detach('showLogin') if $c->has_errors;
+    $c->forward("checkIfChainedAuth");
     my $portalSession = $c->portalSession;
     my $session = $c->session;
     my $profile = $c->profile;
@@ -204,6 +225,59 @@ sub postAuthentication : Private {
     $info->{source} = $source_id;
     $info->{portal} = $profile->getName;
     $c->forward('checkIfProvisionIsNeeded');
+}
+
+=head2 checkIfChainedAuth
+
+Checked to see if source that was authenticated with is chained
+
+=cut
+
+sub checkIfChainedAuth : Private {
+    my ($self, $c) = @_;
+    my $source_id = $c->session->{source_id};
+    my $source = getAuthenticationSource($source_id);
+    #if not chained then leave
+    return unless $source->type eq 'Chained';
+    my $chainedSource = $source->getChainedAuthenticationSourceObject();
+    if( $chainedSource && $self->isGuestSigned($c,$chainedSource)) {
+        $self->setAllowedGuestModes($c,$chainedSource);
+        $c->detach(Signup => 'showSelfRegistrationPage');
+    }
+}
+
+our %GUEST_SOURCE_TYPES = (
+    SMS          => 'sms_guest_allowed',
+    Email        => 'email_guest_allowed',
+    SponsorEmail => 'sponsored_guest_allowed',
+);
+
+=head2 isGuestSigned
+
+Checks to see if the source is a signup source
+
+=cut
+
+sub isGuestSigned {
+    my ($self, $c, $chainedSource) = @_;
+    return exists $GUEST_SOURCE_TYPES{$chainedSource->type};
+}
+
+=head2 setAllowedGuestModes
+
+Overrides the default guest_modes
+
+=cut
+
+sub setAllowedGuestModes {
+    my ($self, $c, $chainedSource) = @_;
+    my $modes = {
+        sms_guest_allowed       => 0,
+        email_guest_allowed     => 0,
+        sponsored_guest_allowed => 0,
+    };
+    $modes->{$GUEST_SOURCE_TYPES{$chainedSource->type}} = 1;
+    $c->session->{allowed_guest_modes} = $modes;
 }
 
 =head2 setupMatchParams
@@ -236,6 +310,7 @@ sub setRole : Private {
     my $info = $c->stash->{info};
     my $pid = $info->{pid};
     my $source_match = $session->{source_match} || $session->{source_id};
+
     # obtain node information provided by authentication module. We need to get the role (category here)
     # as web_node_register() might not work if we've reached the limit
     my $value =
@@ -246,7 +321,8 @@ sub setRole : Private {
         $logger->debug("Got role '$value' for username \"$pid\"");
         $info->{category} = $value;
     } else {
-        $logger->debug("Got no role for username \"$pid\"");
+        $logger->info("Got no role for username \"$pid\"");
+        $self->showError($c, "You do not have the permission to register a device with this username.");
     }
 
 }
@@ -280,6 +356,10 @@ sub setUnRegDate : Private {
         $logger->debug("Got unregdate $value for username \"$pid\"");
         $info->{unregdate} = $value;
     }
+    else {
+        $logger->info("Got no unregdate for username \"$pid\"");
+        $self->showError($c, "The username you have used does not match any configured unregistration date.");
+    }
 
     # We put the unregistration date in session since we may want to use it later in the flow
     $c->session->{unregdate} = $info->{unregdate};
@@ -291,7 +371,7 @@ sub createLocalAccount : Private {
 
     $logger->debug("External source local account creation is enabled for this source. We proceed");
 
-    # We create a "temporary password" (also known as a user account) using the pid 
+    # We create a "password" (also known as a user account) using the pid
     # with different parameters coming from the authentication source (ie.: expiration date)
     my $actions = &pf::authentication::match( $c->session->{source_id}, $auth_params );
 
@@ -302,7 +382,7 @@ sub createLocalAccount : Private {
     # dynamic date, ...) will be the first in the actions array.
     unshift (@$actions, $action);
 
-    my $password = pf::temporary_password::generate($auth_params->{username}, $actions, $c->stash->{sms_pin});
+    my $password = pf::password::generate($auth_params->{username}, $actions, $c->stash->{sms_pin});
 
     # We send the guest and email with the info of the local account
     my %info = (
@@ -364,7 +444,7 @@ sub validateLogin : Private {
         my $aup_signed = $request->param("aup_signed");
         if (   !defined($aup_signed)
             || !$aup_signed ) {
-            $c->error('You need to accept the terms before proceeding any further.');
+            $self->showError($c,'You need to accept the terms before proceeding any further.');
             $c->detach('showLogin');
         }
     } else {
@@ -381,35 +461,24 @@ sub authenticationLogin : Private {
     my $mac           = $portalSession->clientMac;
     my ( $return, $message, $source_id );
     $logger->debug("authentication attempt");
-    my $local;
     if ($request->{'match'} eq "status/login") {
         use pf::person;
         my $person_info = pf::person::person_view($request->param("username"));
         my $source = pf::authentication::getAuthenticationSource($person_info->{source});
         if (defined($source) && $source->{'class'} eq 'external') {
             # Source is external, we have to use local source to authenticate
-            $local = '1';
+            $c->stash( use_local_source => 1 );
         }
         my $options = {
             'portal' => $person_info->{portal},
         };
         $profile = pf::Portal::ProfileFactory->instantiate( $mac, $options);
     }
+    $c->stash( profile => $profile );
 
-    my @sources;
-    if ($local) {
-        @sources = pf::authentication::getAuthenticationSource('local');
-    } else {
-        #If we try to validate a sponsor access then use all Internal Sources
-        if ($request->{'match'} =~ "activate/email") {
-            @sources = @{pf::authentication::getInternalAuthenticationSources()};
-        } else {
-            @sources =
-                ( $profile->getInternalSources, $profile->getExclusiveSources );
-        }
-    }
+    my @sources = $self->getSources($c);
 
-    my $username = $request->param("username");
+    my $username = _clean_username($request->param("username"));
     my $password = $request->param("password");
 
     if(isenabled($profile->reuseDot1xCredentials)) {
@@ -431,7 +500,7 @@ sub authenticationLogin : Private {
         if ( defined($return) && $return == 1 ) {
             # save login into session
             $c->session(
-                "username"  => $request->param("username"),
+                "username"  => $username,
                 "source_id" => $source_id,
                 "source_match" => $source_id,
             );
@@ -440,6 +509,32 @@ sub authenticationLogin : Private {
         }
     }
 
+}
+
+=head2 getSources
+
+Return the source to use to login
+
+=cut
+
+sub getSources : Private {
+    my ($self,$c) = @_;
+    my @sources;
+    my $use_local_source = $c->stash->{use_local_source};
+    my $profile = $c->stash->{profile};
+
+    if ($use_local_source) {
+        @sources = pf::authentication::getAuthenticationSource('local');
+    } else {
+        #If we try to validate a sponsor access then use all Internal Sources
+        if ($c->request->{'match'} =~ "activate/email") {
+            @sources = @{pf::authentication::getInternalAuthenticationSources()};
+        } else {
+            @sources =
+                ( $profile->getInternalSources, $profile->getExclusiveSources );
+        }
+    }
+    return @sources;
 }
 
 sub showLogin : Private {
@@ -456,7 +551,7 @@ sub showLogin : Private {
     }
     $c->stash(
         template        => 'login.html',
-        username        => encode_entities( $request->param("username") ),
+        username        => $request->param_encoded("username") ,
         null_source     => is_in_list( $SELFREG_MODE_NULL, $guestModes ),
         oauth2_github   => is_in_list( $SELFREG_MODE_GITHUB, $guestModes ),
         oauth2_google   => is_in_list( $SELFREG_MODE_GOOGLE, $guestModes ),
@@ -469,13 +564,24 @@ sub showLogin : Private {
     );
 }
 
+sub _clean_username {
+    my ($username) = @_;
+    return $username unless defined $username;
+    # Do cleaning that could be related to a human error input ( like a space after the username )
+
+    # This removes trailing and leading whitespaces
+    $username =~ s/^\s+|\s+$//g ;
+
+    return $username;
+}
+
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

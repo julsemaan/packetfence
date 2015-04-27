@@ -19,8 +19,7 @@ BEGIN {
 }
 
 # create the object
-my $switchFactory = new pf::SwitchFactory;
-my $switch = $switchFactory->instantiate('10.0.0.1');
+my $switch = pf::SwitchFactory->instantiate('10.0.0.1');
 
 # test the object
 isa_ok($switch, 'pf::Switch::Cisco');
@@ -34,7 +33,7 @@ can_ok($switch, qw(
 
 # Catalyst 3750 tests
 
-$switch = $switchFactory->instantiate('10.0.0.4');
+$switch = pf::SwitchFactory->instantiate('10.0.0.4');
 
 # sample NAS-Port -> ifIndex mappings
 my %nasPortIfIndex = (
@@ -54,7 +53,7 @@ foreach my $nasPort (keys %nasPortIfIndex) {
 
 # Catalyst 3750G tests
 
-$switch = $switchFactory->instantiate('10.0.0.10');
+$switch = pf::SwitchFactory->instantiate('10.0.0.10');
 
 # sample NAS-Port -> ifIndex mappings
 %nasPortIfIndex = (
@@ -80,7 +79,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

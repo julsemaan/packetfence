@@ -36,6 +36,7 @@ BEGIN {
 
 use pf::billing::constants;
 use pf::billing::custom;
+use pf::constants;
 use pf::config;
 use pf::web qw(i18n ni18n render_template);
 use pf::web::util;
@@ -148,7 +149,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -19,6 +19,9 @@ use namespace::autoclean;
 use pf::config::cached;
 use Log::Log4perl qw(get_logger);
 use List::MoreUtils qw(uniq);
+use pfconfig::manager;
+use pf::api::jsonrpcclient;
+use pf::cluster;
 
 =head1 FIELDS
 
@@ -35,6 +38,8 @@ has cachedConfig =>
 );
 
 has configFile => ( is => 'ro');
+
+has pfconfigNamespace => ( is => 'ro', default => sub {undef});
 
 has default_section => ( is => 'ro');
 
@@ -388,14 +393,52 @@ sub flatten_list {
 sub commit {
     my ($self) = @_;
     my $result;
+    my $error;
     eval {
         $result = $self->rewriteConfig();
     };
-    get_logger->error($@) if $@;
+    if($@) {
+        $error = $@;
+        get_logger->error($error);
+    }
     unless($result) {
+        $error //= "Unable to commit changes to file please run pfcmd fixpermissions and try again";
         $self->rollback();
     }
-    return $result;
+
+    $self->commitPfconfig;
+
+    return ($result, $error);
+}
+
+sub commitPfconfig {
+    my ($self) = @_;
+
+    if(defined($self->pfconfigNamespace)){
+        if($cluster_enabled){
+            $self->commitCluster();
+        }
+        else {
+            my $manager = pfconfig::manager->new;
+            $manager->expire($self->pfconfigNamespace);            
+        }
+    }
+    else{
+        get_logger->error("Can't expire pfconfig in ".ref($self)." because the pfconfig namespace is not defined.");
+    }
+}
+
+sub commitCluster {
+    my ($self) = @_;
+    my $apiclient = pf::api::jsonrpcclient->new();
+    my %data = (
+        namespace => $self->pfconfigNamespace,
+        conf_file => $self->configFile,
+    );
+    my $result = $apiclient->notify('expire_cluster', %data );
+    unless($result){
+        get_logger->error("Couldn't contact API to expire the configuration.");
+    }
 }
 
 =head2 search
@@ -412,7 +455,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

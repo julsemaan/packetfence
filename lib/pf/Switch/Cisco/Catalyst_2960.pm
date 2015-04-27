@@ -110,6 +110,7 @@ use Net::SNMP;
 use Try::Tiny;
 
 use base ('pf::Switch::Cisco::Catalyst_2950');
+use pf::constants;
 use pf::config;
 use pf::Switch::constants;
 use pf::util;
@@ -586,15 +587,13 @@ sub enableMABByIfIndex {
     return ( defined($result) );
 }
 
-=back
-
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

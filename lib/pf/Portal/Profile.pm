@@ -19,12 +19,11 @@ use warnings;
 
 use List::Util qw(first);
 use List::MoreUtils qw(all none any);
-use pf::config qw($TRUE $FALSE);
+use pf::constants qw($TRUE $FALSE);
 use pf::util;
 use pf::log;
 use pf::node;
 use pf::factory::provisioner;
-use pf::os;
 
 =head1 METHODS
 
@@ -91,6 +90,19 @@ sub getGuestModes {
 }
 
 *guest_modes = \&getGuestModes;
+
+=item getChainedGuestModes
+
+Returns the available enabled modes for guest self-registration for chained sources for the current captive portal profile.
+
+=cut
+
+sub getChainedGuestModes {
+    my ($self) = @_;
+    return $self->{'_chained_guest_modes'};
+}
+
+*chained_guest_modes = \&getChainedGuestModes;
 
 =item getTemplatePath
 
@@ -210,7 +222,7 @@ Returns the internal authentication sources objects for the current captive port
 
 sub getInternalSources {
     my ($self) = @_;
-    return grep { $_->{'class'} eq 'internal' } $self->getSourcesAsObjects();
+    return $self->getSourcesByClass( 'internal' );
 }
 
 =item getExternalSources
@@ -221,7 +233,7 @@ Returns the external authentication sources objects for the current captive port
 
 sub getExternalSources {
     my ($self) = @_;
-    return grep { $_->{'class'} eq 'external' } $self->getSourcesAsObjects();
+    return $self->getSourcesByClass( 'external' );
 }
 
 =item getExclusiveSources
@@ -232,7 +244,30 @@ Returns the exclusive authentication sources objects for the current captive por
 
 sub getExclusiveSources {
     my ($self) = @_;
-    return grep { $_->{'class'} eq 'exclusive' } $self->getSourcesAsObjects();
+    return $self->getSourcesByClass( 'exclusive' );
+}
+
+=item getSourcesByClass
+
+Returns the sources for that match the class
+
+=cut
+
+sub getSourcesByClass {
+    my ($self, $class) = @_;
+    return unless defined $class;
+    return grep { $_->class eq $class } $self->getSourcesAsObjects();
+}
+
+=item hasChained
+
+If the profile has a chained auth source
+
+=cut
+
+sub hasChained {
+    my ($self) = @_;
+    return defined ($self->getSourceByType('chained')) ;
 }
 
 =item getSourceByType
@@ -243,13 +278,22 @@ Returns the first source object for the requested source type for the current ca
 
 sub getSourceByType {
     my ($self, $type) = @_;
-    my $result;
-    if ($type) {
-        $type = uc($type);
-        $result = first {uc($_->{'type'}) eq $type} $self->getSourcesAsObjects;
-    }
+    return unless $type;
+    $type = uc($type);
+    return first {uc($_->{'type'}) eq $type} $self->getSourcesAsObjects;
+}
 
-    return $result;
+=item getSourceByTypeForChained
+
+Returns the first source object for the requested source type for chained sources in the current captive portal profile.
+
+=cut
+
+sub getSourceByTypeForChained {
+    my ($self, $type) = @_;
+    return unless $type;
+    $type = uc($type);
+    return first {uc($_->{'type'}) eq $type} map { $_->getChainedAuthenticationSourceObject } grep { $_->type eq 'Chained' }  $self->getSourcesAsObjects;
 }
 
 =item guestRegistrationOnly
@@ -283,7 +327,7 @@ Verify if the guest mode is allowed for the profile
 
 sub guestModeAllowed {
     my ($self, $mode) = @_;
-    return any { $mode eq $_} @{$self->getGuestModes} ;
+    return any { $mode eq $_} @{$self->getGuestModes}, @{$self->getChainedGuestModes} ;
 }
 
 =item nbregpages
@@ -345,18 +389,23 @@ sub findProvisioner {
     my ($self, $mac, $node_attributes) = @_;
     my $logger = get_logger();
     $node_attributes ||= node_attributes($mac);
-    my ($fingerprint) =
-      dhcp_fingerprint_view( $node_attributes->{'dhcp_fingerprint'} );
-    unless($fingerprint){
-        $logger->warn("Can't find provisioner for $mac since we don't have it's fingerprint");
-        return;
-    }
-    my $os = $fingerprint->{'os'};
+    my $os = $node_attributes->{'device_class'};
     unless(defined $os){
         $logger->warn("Can't find provisioner for $mac since we don't have it's OS");
         return;
     }
     return first { $_->match($os,$node_attributes) } $self->provisionerObjects;
+}
+
+=item dot1xRecomputeRoleFromPortal
+
+Reuse dot1x credentials when authenticating
+
+=cut
+
+sub dot1xRecomputeRoleFromPortal {
+    my ($self) = @_;
+    return $self->{'_dot1x_recompute_role_from_portal'};
 }
 
 =back
@@ -367,7 +416,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

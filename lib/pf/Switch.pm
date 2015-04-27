@@ -23,6 +23,7 @@ use Try::Tiny;
 
 our $VERSION = 2.10;
 
+use pf::constants;
 use pf::config;
 use pf::locationlog;
 use pf::node;
@@ -191,6 +192,17 @@ sub supportsAccessListBasedEnforcement {
     my ( $this ) = @_;
     my $logger = Log::Log4perl::get_logger( ref($this) );
     $logger->info("Access list based enforcement is not supported on network device type " . ref($this) . ". ");
+    return $FALSE;
+}
+
+=item supportsRoamingAccounting
+
+=cut
+
+sub supportsRoamingAccounting {
+    my ( $this ) = @_;
+    my $logger = Log::Log4perl::get_logger( ref($this) );
+    $logger->info("Update of the locationlog based on accounting data is not supported on network device type " . ref($this) . ". ");
     return $FALSE;
 }
 
@@ -1455,6 +1467,7 @@ sub isStaticPortSecurityEnabled {
 Connects to the switch and configures the specified port to be RADIUS floating device ready
 
 =cut
+
 sub enableMABFloatingDevice {
     my ($this, $ifIndex) = @_; 
     my $logger = Log::Log4perl::get_logger( ref($this) );
@@ -1466,6 +1479,7 @@ sub enableMABFloatingDevice {
 Connects to the switch and removes the RADIUS floating device configuration
 
 =cut
+
 sub disableMABFloatingDevice {
     my ($this, $ifIndex) = @_;
     my $logger = Log::Log4perl::get_logger( ref($this) );
@@ -2753,7 +2767,7 @@ sub radiusDisconnect {
         return;
     }
 
-    $logger->info("deauthenticating $mac");
+    $logger->info("[$mac] deauthenticating");
 
     # Where should we send the RADIUS Disconnect-Request?
     # to network device by default
@@ -2846,7 +2860,7 @@ sub returnRadiusAccessAccept {
         }
     }
 
-    $logger->info("[$mac] (".$self->{'_id'}.") Returning ACCEPT with VLAN $vlan and role $role");
+    $logger->info("[$mac] (".$self->{'_id'}.") Returning ACCEPT with VLAN $vlan ".( defined($role) ? "and role $role" : "" ));
     return [$RADIUS::RLM_MODULE_OK, %$radius_reply_ref];
 }
 
@@ -2945,8 +2959,8 @@ sub wiredeauthTechniques {
 }
 
 sub synchronize_locationlog {
-    my ( $self, $ifIndex, $vlan, $mac, $voip_status, $connection_type, $user_name, $ssid) = @_;
-    locationlog_synchronize($self->{_id},$self->{_ip},$self->{_switchMac}, $ifIndex, $vlan, $mac, $voip_status, $connection_type, $user_name, $ssid);
+    my ( $self, $ifIndex, $vlan, $mac, $voip_status, $connection_type, $user_name, $ssid, $stripped_user_name, $realm) = @_;
+    locationlog_synchronize($self->{_id},$self->{_ip},$self->{_switchMac}, $ifIndex, $vlan, $mac, $voip_status, $connection_type, $user_name, $ssid, $stripped_user_name, $realm);
 }
 
 
@@ -2979,7 +2993,7 @@ sub parseRequest {
     my ( $this, $radius_request ) = @_;
 
     my $client_mac      = clean_mac($radius_request->{'Calling-Station-Id'});
-    my $user_name       = $radius_request->{'User-Name'};
+    my $user_name       = $radius_request->{'TLS-Client-Cert-Common-Name'} || $radius_request->{'User-Name'};
     my $nas_port_type   = $radius_request->{'NAS-Port-Type'};
     my $port            = $radius_request->{'NAS-Port'};
     my $eap_type        = ( exists($radius_request->{'EAP-Type'}) ? $radius_request->{'EAP-Type'} : 0 );
@@ -3038,7 +3052,9 @@ sub parseTrap {
     my $self   = shift;
     my $logger = Log::Log4perl::get_logger( ref($self) );
     $logger->warn("SNMP trap handling not implemented for this type of switch.");
-    return undef;
+    my $trapHashRef;
+    $trapHashRef->{'trapType'} = 'unknown';
+    return $trapHashRef;
 }
 
 =item identifyConnectionType
@@ -3046,6 +3062,7 @@ sub parseTrap {
 Used to override L<pf::Connection::identifyType> behavior if needed on a per switch module basis.
 
 =cut
+
 sub identifyConnectionType {
     my ( $self, $connection ) = @_;
     my $logger = Log::Log4perl::get_logger(__PACKAGE__);
@@ -3087,7 +3104,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

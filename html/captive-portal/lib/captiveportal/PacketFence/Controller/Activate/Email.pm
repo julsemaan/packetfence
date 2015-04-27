@@ -7,6 +7,7 @@ BEGIN { extends 'captiveportal::Base::Controller'; }
 use Log::Log4perl;
 use POSIX;
 
+use pf::constants;
 use pf::config;
 use pf::activation qw($GUEST_ACTIVATION $SPONSOR_ACTIVATION);
 use pf::node;
@@ -63,7 +64,7 @@ sub code : Path : Args(1) {
         || ref($activation_record) ne 'HASH'
         || !defined( $activation_record->{'type'} ) ) {
 
-        $c->error(
+        $self->showError($c,
                 "The activation code provided is invalid."
               . " Reasons could be: it never existed, it was already used or has expired."
         );
@@ -104,9 +105,13 @@ TODO: documention
 
 sub login : Private {
     my ( $self, $c ) = @_;
+    if ( $c->has_errors ) {
+        $c->stash->{txt_auth_error} = join(' ', grep { ref ($_) eq '' } @{$c->error});
+        $c->clear_errors;
+    }
     $c->stash(
         template => $pf::web::guest::SPONSOR_LOGIN_TEMPLATE,
-        username => encode_entities( $c->request->param("username") )
+        username => $c->request->param_encoded("username"),
     );
 }
 
@@ -131,7 +136,7 @@ sub doEmailRegistration : Private {
 
     my $email_type =
       pf::Authentication::Source::EmailSource->getDefaultOfType;
-    my $source = $profile->getSourceByType($email_type);
+    my $source = $profile->getSourceByType($email_type) || $profile->getSourceByTypeForChained($email_type);
 
     if ($source) {
 
@@ -141,7 +146,7 @@ sub doEmailRegistration : Private {
             my %info;
             $c->session->{"username"} = $pid;
             $c->session->{source_id} = $source->{id};
-            $c->stash->{info}=\%info; 
+            $c->stash->{info}=\%info;
             $c->forward('Authenticate' => 'postAuthentication');
             $c->forward('Authenticate' => 'createLocalAccount', [$auth_params]) if ( isenabled($source->{create_local_account}) );
 
@@ -157,31 +162,31 @@ sub doEmailRegistration : Private {
 
             $c->stash(
                 template   => $pf::web::guest::EMAIL_CONFIRMED_TEMPLATE,
-                expiration => $c->stash->{info}{unregdate} 
+                expiration => $c->stash->{info}{unregdate}
             );
-        } 
+        }
 
         # Pre-registration email guests self-registration
-        # if we don't have the MAC it means it's a preregister guest generate a password and send 
+        # if we don't have the MAC it means it's a preregister guest generate a password and send
         # an email with an access code
         else {
             my %info = (
                 'pid'     => $pid,
                 'email'   => $email,
-                'subject' => i18n_format(
+                'subject' => utf8::decode(i18n_format(
                     "%s: Guest access confirmed!",
                     $Config{'general'}{'domain'}
-                ),
+                )),
                 'currentdate' =>
                   POSIX::strftime( "%m/%d/%y %H:%M:%S", localtime )
             );
 
-            # we create a temporary password using the actions from
+            # we create a password using the actions from
             # the email authentication source;
             my $actions =
               &pf::authentication::match( $source->{id}, $auth_params );
             $info{'password'} =
-              pf::temporary_password::generate( $pid, $actions );
+              pf::password::generate( $pid, $actions );
 
             # send on-site guest credentials by email
             pf::web::guest::send_template_email(
@@ -229,7 +234,7 @@ sub doSponsorRegistration : Private {
     my $profile = $c->profile;
     my $sponsor_type =
       pf::Authentication::Source::SponsorEmailSource->getDefaultOfType;
-    my $source = $profile->getSourceByType($sponsor_type);
+    my $source = $profile->getSourceByType($sponsor_type) || $profile->getSourceByTypeForChained($sponsor_type);
 
     if ($source) {
 
@@ -251,6 +256,18 @@ sub doSponsorRegistration : Private {
             $c->forward(Authenticate => 'authenticationLogin');
             $c->detach('login') if $c->has_errors;
         }
+        # Verify if the user has the role mark as sponsor
+        my $source_match = $c->session->{source_match} || $c->session->{source_id};
+        my $value = &pf::authentication::match($source_match, {username => $c->session->{"username"}},
+            $Actions::MARK_AS_SPONSOR);
+        unless (defined $value) {
+            $c->log->error( $c->session->{"username"} . " does not have permission to sponsor a user"  );
+            $c->session->{username} = undef;
+            $self->showError($c,"does not have permission to sponsor a user");
+            $c->detach('login');
+        }
+
+
 
         # handling log out (not exposed to the UI at this point)
         # TODO: if we ever expose it, we'll need to alter the form action to make sure to trim it
@@ -277,7 +294,7 @@ sub doSponsorRegistration : Private {
                 $logger->warn(
                     "Problem finding more information about a MAC address ($node_mac) to enable guest access"
                 );
-                $self->showError(
+                $self->showError($c,
                     "There was a problem trying to find the computer to register. The problem has been logged."
                 );
             }
@@ -285,9 +302,9 @@ sub doSponsorRegistration : Private {
 
                     $logger->warn(
                         "node mac: $node_mac has already been registered.");
-                    $self->showError(
-                        "The device with MAC address %s has already been authorized to your network.",
-                        $node_mac
+                    $self->showError($c,
+                        ["The device with MAC address %s has already been authorized to your network.",
+                        $node_mac]
                     );
             }
 
@@ -296,13 +313,14 @@ sub doSponsorRegistration : Private {
 
             $c->session->{"username"} = $pid;
             $c->session->{source_id} = $source->{id};
+            $c->session->{source_match} = undef;
             $c->stash->{info}=\%info; 
             $c->forward('Authenticate' => 'postAuthentication');
             $c->forward('Authenticate' => 'createLocalAccount', [$auth_params]) if ( isenabled($source->{create_local_account}) );
             $c->forward('CaptivePortal' => 'webNodeRegister', [$pid, %{$c->stash->{info}}]);
 
             # We send email to the guest confirming that network access has been enabled
-            $template = $pf::web::guest::TEMPLATE_EMAIL_GUEST_ON_REGISTRATION;
+            $template = $pf::web::guest::TEMPLATE_EMAIL_SPONSOR_CONFIRMED;
             $info{'email'} = $info{'pid'};
             $info{'subject'} = i18n_format("%s: Guest network access enabled", $Config{'general'}{'domain'});
             pf::web::guest::send_template_email($template, $info{'subject'}, \%info);
@@ -325,13 +343,13 @@ sub doSponsorRegistration : Private {
             $info{'cc'} =
             $Config{'guests_self_registration'}{'sponsorship_cc'};
 
-            # we create a temporary password using the actions from the sponsor authentication source;
-            # NOTE: When sponsoring a network access, the new user will be created (in the temporary_password table) using
+            # we create a password using the actions from the sponsor authentication source;
+            # NOTE: When sponsoring a network access, the new user will be created (in the password table) using
             # the actions of the sponsor authentication source of the portal profile on which the *sponsor* has landed.
             my $actions = &pf::authentication::match( $source->{id},
                 { username => $pid, user_email => $pid } );
             $info{'password'} =
-              pf::temporary_password::generate( $pid, $actions );
+              pf::password::generate( $pid, $actions );
 
             pf::web::guest::send_template_email( $template, $info{'subject'},
                 \%info );
@@ -358,7 +376,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

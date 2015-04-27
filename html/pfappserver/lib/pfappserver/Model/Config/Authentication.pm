@@ -42,7 +42,7 @@ We especially don't want to allow the modification of the local SQL database.
 sub readAll {
     my ($self) = @_;
     my $sql_type = pf::Authentication::Source::SQLSource->meta->get_attribute('type')->default;
-    my @sources = grep { $_->{type} ne $sql_type } @authentication_sources;
+    my @sources = grep { $_->{type} ne $sql_type } @pf::ConfigStore::Authentication::auth_sources;
 
     return ($STATUS::OK, \@sources);
 }
@@ -74,11 +74,9 @@ __PACKAGE__->meta->make_immutable;
 
 Inverse inc. <info@inverse.ca>
 
-Minor parts of this file may have been contributed. See CREDITS.
-
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -14,14 +14,15 @@ pf::ConfigStore::Violations
 
 use Moo;
 use namespace::autoclean;
+use pf::file_paths;
 
 use pf::violation_config;
 
 extends 'pf::ConfigStore';
 
-sub _buildCachedConfig {
-    $pf::violation_config::cached_violations_config
-};
+sub configFile { $violations_config_file }
+
+sub pfconfigNamespace { 'config::Violations' }
 
 =head1 Methods
 
@@ -146,6 +147,13 @@ sub cleanupBeforeCommit {
     delete $violation->{'window_dynamic'};
 }
 
+sub commit {
+    my ( $self ) = @_;
+    my ($result,$msg) = $self->SUPER::commit();
+    pf::violation_config::loadViolationsIntoDb();
+    return ($result,$msg);
+}
+
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>
@@ -153,7 +161,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

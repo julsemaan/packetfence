@@ -83,6 +83,7 @@ use pf::db;
 use pf::node;
 use pf::scan qw($SCAN_VID);
 use pf::util;
+use pf::config::util;
 use pf::client;
 
 # The next two variables and the _prepare sub are required for database handling magic (see pf::db)
@@ -772,18 +773,11 @@ sub violation_maintenance {
 
     $logger->debug("Looking at expired violations... batching $batch timelimit $timelimit");
     my $start_time = time;
-    my $endtime;
-    my $done = 0;
-LOOP: {
-    do {
+    my $end_time;
+    my $rows_processed = 0;
+    while(1) {
         my $query = db_query_execute(VIOLATION, $violation_statements, 'violation_release_sql',$batch) || return (0);
         my $rows = $query->rows;
-        if ($rows == 0 ) {
-            $logger->trace("no more violations to process");
-            $query->finish;
-            last;
-        }
-        $logger->trace("processing $rows violation(s)");
         my $client = pf::client::getClient();
         while (my $row = $query->fetchrow_hashref()) {
             if($row->{status} eq 'delayed' ) {
@@ -799,12 +793,13 @@ LOOP: {
                 }
             }
         }
+        $rows_processed+=$rows;
         $query->finish;
-        $endtime = time;
-        $logger->trace("starttime: $start_time, endtime: $endtime");
-    } while( (($endtime - $start_time) < $timelimit) );
-}
-
+        $logger->trace( sub { "processed $rows_processed violations during violation maintenance ($start_time $end_time) " });
+        $end_time = time;
+        last if $rows == 0 || ((time - $start_time) > $timelimit);
+    }
+    $logger->info(  "processed $rows_processed violations during violation maintenance ($start_time $end_time) " );
     return (1);
 }
 
@@ -848,7 +843,7 @@ Minor parts of this file may have been contributed. See CREDITS.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 Copyright (C) 2005 Kevin Amorin
 

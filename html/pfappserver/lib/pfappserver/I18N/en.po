@@ -1,5 +1,5 @@
 # English translations for PacketFence package.
-# Copyright (C) 2012-2014 Inverse inc.
+# Copyright (C) 2005-2015 Inverse inc.
 # This file is distributed under the same license as the PacketFence package.
 #
 msgid ""
@@ -3820,6 +3820,14 @@ msgid "advanced.reevaluate_access_reasons"
 msgstr "Reevaluate access reasons"
 
 # conf/documentation.conf
+msgid "advanced.hash_passwords"
+msgstr "Database passwords hashing method"
+
+# conf/documentation.conf
+msgid "advanced.hashing_cost"
+msgstr "Database passwords hashing cost factor" 
+
+# conf/documentation.conf
 msgid "alerting"
 msgstr "Alerting"
 
@@ -4035,7 +4043,7 @@ msgstr ""
 
 # pf::pfcmd::report (SQL)
 msgid "dhcp_fingerprint"
-msgstr "Operating System Class"
+msgstr "DHCP Fingerprint"
 
 # conf/documentation.conf (interface.type options)
 msgid "dhcplistener"
@@ -4426,6 +4434,12 @@ msgstr "Maintenance"
 msgid "maintenance.iplog_cleanup_interval"
 msgstr "Iplog Cleanup Interval"
 
+msgid "maintenance.iplog_cleanup_batch"
+msgstr "Iplog Cleanup Batch"
+
+msgid "maintenance.iplog_cleanup_timeout"
+msgstr "Iplog Cleanup Timeout"
+
 # conf/documentation.conf (maintenance.node_cleanup_interval)
 msgid "maintenance.node_cleanup_interval"
 msgstr "Node Cleanup Interval"
@@ -4433,6 +4447,14 @@ msgstr "Node Cleanup Interval"
 # conf/documentation.conf (maintenance.locationlog_cleanup_interval)
 msgid "maintenance.locationlog_cleanup_interval"
 msgstr "Locationlog Cleanup Interval"
+
+# conf/documentation.conf (maintenance.locationlog_cleanup_interval)
+msgid "maintenance.locationlog_cleanup_batch"
+msgstr "Locationlog Cleanup Batch"
+
+# conf/documentation.conf (maintenance.locationlog_cleanup_interval)
+msgid "maintenance.locationlog_cleanup_timeout"
+msgstr "Locationlog Cleanup Timeout"
 
 # conf/documentation.conf (maintenance.traplog_cleanup_interval)
 msgid "maintenance.traplog_cleanup_interval"
@@ -4469,6 +4491,10 @@ msgstr "Inline Accounting Maintenance Interval"
 # conf/documentation.conf (maintenance.acct_maintenance_interval)
 msgid "maintenance.acct_maintenance_interval"
 msgstr "Acct Maintenance Interval"
+
+# conf/documentation.conf (maintenance.acct_maintenance_interval)
+msgid "maintenance.provisioning_compliance_poll_interval"
+msgstr "Provisioning Compliance Poll Interval"
 
 # conf/documentation.conf (advanced.reevaluate_access_reasons options)
 msgid "manage_deregister"
@@ -4513,6 +4539,11 @@ msgstr ""
 # pf::Authentication::Source::LDAPSource (available_attributes)
 msgid "memberOf"
 msgstr ""
+
+# pf::Authentication::Source::ADSource (available_attributes)
+# pf::Authentication::Source::LDAPSource (available_attributes)
+msgid "memberOf:1.2.840.113556.1.4.1941:"
+msgstr "nested group"
 
 # html/pfappserver/lib/pfappserver/Form/Field/Duration.pm
 msgid "minutes"
@@ -5134,6 +5165,18 @@ msgstr "Protocol"
 # conf/documentation.conf
 msgid "webservices.user"
 msgstr "Username"
+
+# conf/documentation.conf
+msgid "monitoring"
+msgstr "Monitoring"
+
+# conf/documentation.conf
+msgid "monitoring.statsd_host"
+msgstr "StatsD host"
+
+# conf/documentation.conf
+msgid "monitoring.statsd_port"
+msgstr "StatsD port"
 
 # html/pfappserver/lib/pfappserver/Form/Field/Duration.pm
 msgid "weeks"

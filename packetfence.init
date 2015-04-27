@@ -13,14 +13,7 @@ source /etc/rc.d/init.d/functions
 [ -x /usr/local/pf/bin/pfcmd ] || exit 1
 
 start() {
-	#Check if MySQL is started
-        if [ ! -f /var/run/mysqld/mysqld.pid ] && [ ! -f /var/lib/mysql/`hostname`.pid ]; then
-                if [ -f /etc/init.d/mysqld ]; then
-                        [ -d /var/lib/mysql/pf ] && /etc/init.d/mysqld start
-                else
-                        [ -d /var/lib/mysql/pf ] && /etc/init.d/mysql start
-                fi
-        fi
+  pfconfig
 	echo -n $"Starting PacketFence..."
 	IPSET=`command -v ipset`
 	if [ $IPSET ]; then
@@ -36,6 +29,7 @@ start() {
 }
 
 stop() {
+  pfconfig
 	echo -n $"Shutting down PacketFence..."
 	/usr/local/pf/bin/pfcmd service pf stop
 	RETVAL=$?
@@ -44,19 +38,21 @@ stop() {
 }
 
 restart() {
-	#Check if MySQL is started
-        if [ ! -f /var/run/mysqld/mysqld.pid ] && [ ! -f /var/lib/mysql/`hostname`.pid ]; then
-                if [ -f /etc/init.d/mysqld ]; then
-                        [ -d /var/lib/mysql/pf ] && /etc/init.d/mysqld start
-                else
-                        [ -d /var/lib/mysql/pf ] && /etc/init.d/mysql start
-                fi
-        fi
+  pfconfig
 	echo -n $"Restarting PacketFence..."
 	/usr/local/pf/bin/pfcmd service pf restart
 	RETVAL=$?
 	echo
 	return $RETVAL
+}
+
+pfconfig() {
+    # Check if packetfence-config is started
+	  if [ ! -f /usr/local/pf/var/run/pfconfig.pid ] || ! ps -p $(cat /usr/local/pf/var/run/pfconfig.pid) > /dev/null; then
+            if [ -f /etc/init.d/packetfence-config ]; then
+                    /etc/init.d/packetfence-config start
+            fi
+    fi
 }
 
 case "$1" in
@@ -70,6 +66,7 @@ case "$1" in
 	restart
 	;;
   status)
+  pfconfig
 	/usr/local/pf/bin/pfcmd service pf status
 	if [ ! -f /usr/local/pf/var/run/pfmon.pid ]; then
 		RETVAL=3

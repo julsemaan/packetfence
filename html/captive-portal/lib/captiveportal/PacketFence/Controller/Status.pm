@@ -2,6 +2,7 @@ package captiveportal::PacketFence::Controller::Status;
 use Moose;
 use namespace::autoclean;
 use pf::util;
+use pf::constants;
 use pf::config;
 use pf::node;
 use pf::person;
@@ -64,7 +65,7 @@ sub setupCurrentNodeInfo : Private {
     my ( $self, $c ) = @_;
     my $portalSession = $c->portalSession;
     my $node_info     = node_view( $portalSession->clientMac() );
-    if( $node_info && $node_info->{pid} ne $default_pid ) {
+    if( $node_info && ($node_info->{pid} ne $default_pid && $node_info->{pid} ne $admin_pid ) ) {
         setExpiration($node_info);
     }
     $c->stash(
@@ -109,6 +110,11 @@ sub logout : Local {
 
 =head1 AUTHOR
 
+Inverse inc. <info@inverse.ca>
+
+=head1 COPYRIGHT
+
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
@@ -128,7 +134,5 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
 USA.
 
 =cut
-
-__PACKAGE__->meta->make_immutable;
 
 1;

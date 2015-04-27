@@ -75,9 +75,11 @@ use warnings;
 use Log::Log4perl;
 use Readonly;
 
+use pf::constants;
 use pf::config;
 use pf::locationlog;
 use pf::util;
+use pf::config::util;
 
 =head1 SUBROUTINES
             
@@ -226,6 +228,7 @@ sub disablePortConfig {
 Removes the MAB floating device mode on the switchport
 
 =cut
+
 sub disableMABFloating {
     my ( $this, $switch, $ifIndex ) = @_;
     
@@ -239,6 +242,7 @@ sub disableMABFloating {
 Puts the switchport in MAB floating device mode
 
 =cut
+
 sub enableMABFloating{
     my ( $this, $mac, $switch, $ifIndex ) = @_;
     my $logger = Log::Log4perl::get_logger('pf::floatingdevice');
@@ -261,6 +265,7 @@ sub enableMABFloating{
 Verifies if there is a floating device plugged into the switchport in the locationlog
 
 =cut
+
 sub portHasFloatingDevice {
     my ($this, $switch, $switch_port) = @_;
     my $logger = Log::Log4perl::get_logger('pf::floatingdevice');
@@ -283,6 +288,7 @@ sub portHasFloatingDevice {
 Disconnects the active locationlog macs on the port so they reauthenticate to be controlled by the floating flow
 
 =cut
+
 sub _disconnectCurrentDevices{
     my ( $this, $switch, $switch_port ) = @_;
     my $logger = Log::Log4perl::get_logger('pf::floatingdevice');
@@ -308,7 +314,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005-2013 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

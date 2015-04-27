@@ -23,6 +23,7 @@ use pf::accounting qw(
     node_accounting_daily_bw node_accounting_weekly_bw node_accounting_monthly_bw node_accounting_yearly_bw
     node_accounting_daily_time node_accounting_weekly_time node_accounting_monthly_time node_accounting_yearly_time
 );
+use pf::constants;
 use pf::config;
 use pf::error qw(is_error is_success);
 use pf::node;
@@ -30,11 +31,11 @@ use pf::iplog;
 use pf::locationlog;
 use Log::Log4perl qw(get_logger);
 use pf::node;
-use pf::os;
 use pf::person;
 use pf::enforcement qw(reevaluate_access);
 use pf::useragent qw(node_useragent_view);
 use pf::util;
+use pf::config::util;
 use pf::violation;
 
 =head1 METHODS
@@ -160,18 +161,18 @@ sub view {
         }
 
         # Fetch IP information
-        $node->{iplog} = iplog_view_open_mac($mac);
+        $node->{iplog} = pf::iplog::view($mac);
 
         # Fetch the IP activity of the past 14 days
 #        my $start_time = time() - 14 * 24 * 60 * 60;
 #        my $end_time = time();
-#        my @iplog_history = iplog_history_mac($mac,
+#        my @iplog_history = iplog_history($mac,
 #                                              (start_time => $start_time, end_time => $end_time));
 #        $node->{iplog}->{history} = \@iplog_history;
 #        _graphIplogHistory($node, $start_time, $end_time);
 
         # Fetch IP address history
-        my @iplog_history = iplog_history_mac($mac);
+        my @iplog_history = iplog_history($mac);
         map { $_->{end_time} = '' if ($_->{end_time} eq '0000-00-00 00:00:00') } @iplog_history;
         $node->{iplog}->{history} = \@iplog_history;
 
@@ -193,12 +194,6 @@ sub view {
         # Fetch user-agent information
         if ($node->{user_agent}) {
             $node->{useragent} = node_useragent_view($mac);
-        }
-
-        # Fetch DHCP fingerprint information
-        if ($node->{'dhcp_fingerprint'}) {
-            my @fingerprint_info = dhcp_fingerprint_view( $node->{'dhcp_fingerprint'} );
-            $node->{dhcp} = pop @fingerprint_info;
         }
 
         #    my $node_accounting = node_accounting_view($mac);
@@ -341,17 +336,21 @@ sub importCSV {
 
     # Read CSV file
     $count = 0;
+    my $has_pid = exists $index{'pid'};
     if (open (my $import_fh, "<", $tmpfilename)) {
         my $csv = Text::CSV->new({ binary => 1, sep_char => $delimiter });
         while (my $row = $csv->getline($import_fh)) {
             my ($pid, $mac, $node, %data, $result);
 
-            $pid = $row->[$index{'pid'}] || undef if exists $index{'pid'};
-            if ($pid && ($pid !~ /$pf::person::PID_RE/ || !person_exist($pid))) {
-                $logger->debug("Ignored unknown PID ($pid)");
-                $skipped++;
-                next;
+            if($has_pid) {
+                $pid = $row->[$index{'pid'}] || undef;
+                if ( $pid && ($pid !~ /$pf::person::PID_RE/ || !person_exist($pid))) {
+                    $logger->debug("Ignored unknown PID ($pid)");
+                    $skipped++;
+                    next;
+                }
             }
+
             $mac = $row->[$index{'mac'}] || undef;
             if (!$mac || !valid_mac($mac)) {
                 $logger->debug("Ignored invalid MAC ($mac)");
@@ -765,7 +764,8 @@ sub bulkApplyRole {
     my $count = 0;
     foreach my $mac (@macs) {
         my $node = node_view($mac);
-        if ($node->{category_id} != $role) {
+        my $old_category_id = $node->{category_id};
+        if (!defined($old_category_id) || $old_category_id != $role) {
             # Role has changed
             $node->{category_id} = $role;
             if (node_modify($mac, %{$node})) {
@@ -780,12 +780,37 @@ sub bulkApplyRole {
     return ($STATUS::OK, ["Role was changed for [_1] node(s)", $count]);
 }
 
+=head2 bulkApplyBypassRole
+
+=cut
+
+sub bulkApplyBypassRole {
+    my ($self, $role, @macs) = @_;
+    my $count = 0;
+    foreach my $mac (@macs) {
+        my $node = node_view($mac);
+        my $old_bypass_role = $node->{bypass_role};
+        if (!defined($old_bypass_role) || $old_bypass_role != $role) {
+            # Role has changed
+            $node->{bypass_role} = $role;
+            if (node_modify($mac, %{$node})) {
+                $count++;
+                if (!defined($node->{last_dot1x_username}) || length($node->{last_dot1x_username}) == 0) {
+                    # The role has changed and is not currently using 802.1X
+                    reevaluate_access($mac, "node_modify");
+                }
+            }
+        }
+    }
+    return ($STATUS::OK, ["Bypass Role was changed for [_1] node(s)", $count]);
+}
+
 =head2 bulkReevaluateAccess
 
 =cut
 
 sub bulkReevaluateAccess {
-    my ($self, $role, @macs) = @_;
+    my ($self, @macs) = @_;
     my $count = 0;
     foreach my $mac (@macs) {
         if (reevaluate_access($mac, "node_modify")){
@@ -801,7 +826,7 @@ Inverse inc. <info@inverse.ca>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2013-2014 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 

@@ -47,6 +47,13 @@ has_field 'category_id' =>
    element_class => ['chzn-deselect'],
    element_attr => {'data-placeholder' => 'No role'},
   );
+has_field 'bypass_role_id' =>
+  (
+   type => 'Select',
+   label => 'Bypass Role',
+   element_class => ['chzn-deselect'],
+   element_attr => {'data-placeholder' => 'No role'},
+  );
 has_field 'regdate' =>
   (
    type => 'Uneditable',
@@ -82,6 +89,16 @@ has_field 'computername' =>
    type => 'Uneditable',
    label => 'Name',
   );
+has_field 'device_type' =>
+  (
+   type => 'Uneditable',
+   label => 'Device Type',
+  );
+has_field 'device_class' =>
+ (
+   type => 'Uneditable',
+   label => 'Device class',
+ );
 has_field 'voip' =>
   (
    type => 'Checkbox',
@@ -92,6 +109,11 @@ has_field 'last_dot1x_username' =>
   (
    type => 'Uneditable',
    label => '802.1X Username',
+  );
+has_field 'bypass_vlan' =>
+  (
+   type => 'Text',
+   label => 'Bypass VLAN',
   );
 has_field 'user_agent' =>
   (
@@ -141,6 +163,15 @@ sub options_category_id {
     return ('' => '', @roles);
 }
 
+=head2 options_bypass_role_id
+
+=cut
+
+sub options_bypass_role_id {
+    my $self = shift;
+    return $self->options_category_id();
+}
+
 =head2 validate
 
 Make sure the specified user ID (pid) exists
@@ -160,7 +191,7 @@ sub validate {
 
 =head1 COPYRIGHT
 
-Copyright (C) 2012 Inverse inc.
+Copyright (C) 2005-2015 Inverse inc.
 
 =head1 LICENSE
 
