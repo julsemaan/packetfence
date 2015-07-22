@@ -62,6 +62,8 @@ BEGIN {
         is_prod_interface
         valid_ip_range
         cert_has_expired
+        read_utf8_file
+        write_utf8_file
     );
 }
 
@@ -1009,6 +1011,36 @@ sub cert_has_expired {
     my $cert = Crypt::OpenSSL::X509->new_from_file($path);
     my $expiration = str2time($cert->notAfter);
     return time > $expiration;
+}
+
+=item read_utf8_file
+
+Opens a file and reads it's content using UTF-8 encoding
+
+=cut
+
+sub read_utf8_file {
+    my ($path) = @_;
+    open my $fh, "<:encoding(UTF-8)", $path or die "Couldn't open file $path for reading : $!";
+    my $file_content;
+    while(my $line = <$fh>){
+        $file_content .= $line;
+    }
+    close $fh;
+    return $file_content;
+}
+
+=item write_utf8_file
+
+Opens a file and writes the content using UTF-8 encoding
+
+=cut
+
+sub write_utf8_file {
+    my ($path, $file_content) = @_;
+    open my $fh, ">:encoding(UTF-8)", $path or die "Couldn't open file $path for writing : $!";
+    print $fh $file_content;
+    close $fh;
 }
 
 =back

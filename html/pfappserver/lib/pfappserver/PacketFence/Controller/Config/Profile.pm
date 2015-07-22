@@ -20,7 +20,7 @@ use pf::config;
 use File::Copy;
 use HTTP::Status qw(:constants is_error is_success);
 use pf::util;
-use File::Slurp qw(read_dir read_file write_file);
+use File::Slurp qw(read_dir);
 use File::Spec::Functions;
 use File::Copy::Recursive qw(dircopy);
 use File::Basename qw(fileparse);
@@ -132,7 +132,8 @@ sub edit :Chained('object') :PathPart :Args() :AdminRole('PORTAL_PROFILES_UPDATE
     my $full_file_name = catfile(@pathparts);
     my ($file_name,$directory) = fileparse($full_file_name);
     my $file_path = $self->_makeFilePath($c,$full_file_name);
-    my $file_content = read_file($file_path);
+    my $file_content = read_utf8_file($file_path);
+
     $directory = '' if $directory eq './';
     $directory = catfile($c->stash->{id}, $directory);
     $directory .= "/" unless $directory =~ /\/$/;
@@ -151,7 +152,7 @@ sub edit_new :Chained('object') :PathPart :Args() :AdminRole('PORTAL_PROFILES_UP
     my $file_path = $self->_makeFilePath($c, $full_file_name);
     my $file_content = '';
     if (-e $file_path) {
-        $file_content = read_file($file_path);
+        $file_content = read_utf8_file($file_path);
     }
     elsif($full_file_name =~ /\.html$/) {
         $file_content = <<'HTML';
@@ -215,7 +216,7 @@ sub save :Chained('object') :PathPart :Args() :AdminRole('PORTAL_PROFILES_UPDATE
     my $file_content = $c->req->param("file_content") || '';
     my $path = $self->_makeFilePath($c, @pathparts);
     $c->stash->{current_view} = 'JSON';
-    write_file($path, $file_content);
+    write_utf8_file($path, $file_content);
 }
 
 sub show_preview :Chained('object') :PathPart :Args() :AdminRole('PORTAL_PROFILES_READ') {
@@ -249,7 +250,8 @@ sub _makePreviewTemplate {
     if ($pathparts[0] eq 'violations') {
         $template = 'remediation.html';
     } else {
-        my $file_content = read_file($self->_makeFilePath($c,@pathparts));
+        my $path = $self->_makeFilePath($c,@pathparts);
+        my $file_content = read_utf8_file($path);
         $file_content =~ s/
             \[%\s*INCLUDE\s+\$[a-zA-Z_][a-zA-Z0-9_]+\s*%\]/
          <div>Your included template here<\/div>
