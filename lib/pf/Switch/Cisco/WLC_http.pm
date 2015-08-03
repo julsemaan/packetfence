@@ -238,7 +238,6 @@ sub radiusDisconnect {
         my $roleResolver = pf::roles::custom->instance();
         my $role = $roleResolver->getRoleForNode($mac, $self);
 
-        my $acctsessionid = node_accounting_current_sessionid($mac);
         my $node_info = node_view($mac);
         # transforming MAC to the expected format 00-11-22-33-CA-FE
         $mac = uc($mac);
@@ -284,11 +283,14 @@ sub radiusDisconnect {
 
         }
         else {
+            my $acctsessionid = node_accounting_current_sessionid($mac);
+            $attributes_ref->{'Acct-Session-ID'} = $acctsessionid;
+
             $connection_info = {
                 nas_ip => $send_disconnect_to,
                 secret => $self->{'_radiusSecret'},
                 LocalAddr => $management_network->tag('vip'),
-                nas_port => '3799',
+                nas_port => $self->{'_controllerPort'} ? $self->{'_controllerPort'} : '3799',
             };
             $response = perform_disconnect($connection_info, $attributes_ref);
         }
@@ -299,7 +301,7 @@ sub radiusDisconnect {
     };
     return if (!defined($response));
 
-    return $TRUE if ($response->{'Code'} eq 'CoA-ACK');
+    return $TRUE if ($response->{'Code'} eq 'CoA-ACK') || ($response->{'Code'} eq 'Disconnect-ACK');
 
     $logger->warn(
         "[$mac] Unable to perform RADIUS Disconnect-Request on (".$self->{'_id'}.")."
