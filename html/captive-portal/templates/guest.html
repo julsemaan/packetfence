@@ -3,6 +3,17 @@
     body_attributes = 'onload="$(\'firstfield\').focus();"';
 %]
 
+        <div class="underlined" style="text-align:center">
+          <div style="display:inline-block;width:353px;">
+            <h3 style="float:left;display:inline-block">Register using : </h4>
+            <form id="guest-signup-method">
+              <input class="signup-mode" checked="checked" type="radio" name="signup-mode" value="email-mode">E-mail<br>
+              <input class="signup-mode" type="radio" name="signup-mode" value="sms-mode">SMS<br>
+            </form>
+          </div>
+        </div>
+        <hr/>
+
         <div id="about" class="underlined">
           <img src="/content/images/registration.png" alt="Registration" />
           <h1>[% i18n("Guest Registration") %]</h1>
@@ -15,18 +26,10 @@
         <form method="post" action="[% post_uri %]">
           <input type="hidden" name="destination_url" value="[% destination_url %]" />
 
-          <div class="input">
-            <span>[% i18n("Firstname") %]</span>
-            <input class="field" name="firstname" id="firstfield" type="text" value="[% firstname | html %]" />
-
-            <span>[% i18n("Lastname") %]</span>
-            <input class="field" name="lastname" type="text" value="[% lastname | html %]" />
-          </div>
-
         [% skipFields = {firstname => undef, lastname => undef} %]
         [% FOREACH field IN mandatory_fields %]
         [%- NEXT IF skipFields.exists(field) -%]
-          <div class="input">
+          <div class="input" id="field-[% field %]">
             [% IF (field == 'mobileprovider') %]
               <span>[% i18n("Phone Provider") %]</span>
               <select name="mobileprovider">
@@ -120,6 +123,27 @@
           </div>
 
         </form>
+
+
+<!-- CUSTOM hide/display fields depending on the registration type -->
+<script>
+$('guest-signup-method').on('change', '.signup-mode', function(event) {
+  console.log(event.target.value);
+  if(event.target.value == "sms-mode"){
+    $('field-email').hide();
+    $('field-mobileprovider').show();
+    $('field-phone').show();
+  }
+  else {
+    $('field-mobileprovider').hide();
+    $('field-phone').hide();
+    $('field-email').show();
+  }
+});
+
+$('field-mobileprovider').hide();
+$('field-phone').hide();
+</script>
 
 [% INCLUDE footer.html 
     dont_show_help = is_preregistration

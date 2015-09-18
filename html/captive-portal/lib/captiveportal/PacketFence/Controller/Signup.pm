@@ -469,9 +469,12 @@ sub setupSelfRegistrationSession : Private {
       pf::web::util::validate_phone_number( $phone );
     $c->session->{sponsor} = lc( $request->param("sponsor_email") );
 
+    # CUSTOM : use the phone as PID if we are in the SMS source
+    my $guest_pid_finder = 
+      $request->param('by_sms') ? 'phone' : $Config{'guests_self_registration'}{'guest_pid'};
+
     # guest pid is configurable (defaults to email)
-    $c->session->{guest_pid} =
-        $c->session->{ $Config{'guests_self_registration'}{'guest_pid'} };
+    $c->session->{guest_pid} = $c->session->{ $guest_pid_finder };
 }
 
 =head2 validatePreregistration
