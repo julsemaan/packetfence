@@ -98,27 +98,31 @@
             [% END %]
 
             [% IF email_guest_allowed %]
-            <div class="note bg">
-              [% IF is_preregistration %]
-                <p>[% i18n("If you choose to receive your access code <strong>by email</strong>, you will have to click on an activation link sent to your email address. After clicking on the link you will receive guest credentials to use on-site by email") %]</p>
-              [% ELSE %]
-                <p>[% i18n("If you choose to receive your access code <strong>by email</strong>, you will be given temporary network access for 10 minutes during that time:") %]</p>
-                <ul>
-                  <li>[% i18n("Login to the email account you referenced and;") %]</li>
-                  <li>[% i18n("Click on the link emailed to you to validate network access for the next 24 hours.") %]</li>
-                </ul>
-              [% END %]
+            <div id="email-submit">
+              <div class="note bg">
+                [% IF is_preregistration %]
+                  <p>[% i18n("If you choose to receive your access code <strong>by email</strong>, you will have to click on an activation link sent to your email address. After clicking on the link you will receive guest credentials to use on-site by email") %]</p>
+                [% ELSE %]
+                  <p>[% i18n("If you choose to receive your access code <strong>by email</strong>, you will be given temporary network access for 10 minutes during that time:") %]</p>
+                  <ul>
+                    <li>[% i18n("Login to the email account you referenced and;") %]</li>
+                    <li>[% i18n("Click on the link emailed to you to validate network access for the next 24 hours.") %]</li>
+                  </ul>
+                [% END %]
 
+              </div>
+              <input type="submit" class="btn" name="by_email" value="[% i18n("Register by Email") %]" /><br/>
             </div>
-            <input type="submit" class="btn" name="by_email" value="[% i18n("Register by Email") %]" /><br/>
             [% END %]
 
             [% IF sms_guest_allowed and !is_preregistration %]
-            <div class="note bg">
-              <p>[% i18n("If you choose to receive your access code <strong>by SMS</strong>, you will be able to enter it on the next page.") %]</p>
+            <div id="sms-submit">
+              <div class="note bg">
+                <p>[% i18n("If you choose to receive your access code <strong>by SMS</strong>, you will be able to enter it on the next page.") %]</p>
+              </div>
+              <input type="submit" class="btn" name="by_sms" value="[% i18n("Register by SMS") %]" />
+              [% END %]
             </div>
-            <input type="submit" class="btn" name="by_sms" value="[% i18n("Register by SMS") %]" />
-            [% END %]
 
           </div>
 
@@ -131,18 +135,23 @@ $('guest-signup-method').on('change', '.signup-mode', function(event) {
   console.log(event.target.value);
   if(event.target.value == "sms-mode"){
     $('field-email').hide();
+    $('email-submit').hide();
     $('field-mobileprovider').show();
     $('field-phone').show();
+    $('sms-submit').show();
   }
   else {
     $('field-mobileprovider').hide();
+    $('sms-submit').hide();
     $('field-phone').hide();
     $('field-email').show();
+    $('email-submit').show();
   }
 });
 
 $('field-mobileprovider').hide();
 $('field-phone').hide();
+$('sms-submit').hide();
 </script>
 
 [% INCLUDE footer.html 
