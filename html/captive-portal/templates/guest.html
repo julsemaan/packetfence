@@ -8,7 +8,7 @@
             <h3 style="float:left;display:inline-block">Register using : </h4>
             <form id="guest-signup-method">
               <input class="signup-mode" checked="checked" type="radio" name="signup-mode" value="email-mode">E-mail<br>
-              <input class="signup-mode" type="radio" name="signup-mode" value="sms-mode">SMS<br>
+              <input class="signup-mode" type="radio" name="signup-mode" value="sms-mode">Text<br>
             </form>
           </div>
         </div>
@@ -38,7 +38,7 @@
                     [% END %]
               </select>
               [% IF sms_guest_allowed %]
-                <em>Required to receive your access code by SMS</em>
+                <em>Required to receive your access code by phone text</em>
               [% END %]
             [% ELSIF (field == 'sponsor_email') %]
               <span>[% i18n("Sponsor's email") %]</span>
@@ -56,7 +56,7 @@
               <span>[% i18n("$field") %]</span>
               <input class="field" name="[% field %]" type="text" value="[% phone | html %]" /><br/>
               [% IF sms_guest_allowed %]
-                <em>Required for SMS network access</em>
+                <em>Required for phone network access</em>
               [% END %]
             [% ELSE %]
               <span>[% i18n("$field") %]</span>
@@ -118,9 +118,9 @@
             [% IF sms_guest_allowed and !is_preregistration %]
             <div id="sms-submit">
               <div class="note bg">
-                <p>[% i18n("If you choose to receive your access code <strong>by SMS</strong>, you will be able to enter it on the next page.") %]</p>
+                <p>[% i18n("If you choose to receive your access code <strong>by Text</strong>, you will be able to enter it on the next page.") %]</p>
               </div>
-              <input type="submit" class="btn" name="by_sms" value="[% i18n("Register by SMS") %]" />
+              <input type="submit" class="btn" name="by_sms" value="[% i18n("Register by Text") %]" />
               [% END %]
             </div>
 
