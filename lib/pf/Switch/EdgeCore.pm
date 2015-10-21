@@ -32,6 +32,11 @@ sub description { 'EdgeCore' }
 =cut
 
 sub supportsWiredMacAuth { return $TRUE; }
+sub supportsRoleBasedEnforcement { return $TRUE; }
+
+sub returnRoleAttribute {
+    return "Filter-Id";
+}
 
 =head1 AUTHOR
 

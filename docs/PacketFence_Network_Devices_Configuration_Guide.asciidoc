@@ -1495,6 +1495,37 @@ interface ethernet 1/8
 
 ----
 
+Access-List enforcement
++++++++++++++++++++++++
+
+First, configure the global configuration and interfaces using the steps above.
+
+Then create your access list. The one below only allows DHCP and UDP communication with 10.0.0.6
+
+----
+
+access-list IP extended test
+ permit UDP any host 10.0.0.6
+ permit UDP any any source-port 67
+ permit UDP any any destination-port 67
+ permit UDP any any source-port 68
+ permit UDP any any destination-port 68
+ deny UDP any any
+
+----
+
+You also need to add the following to each interface
+
+----
+
+interface ethernet 1/8
+ network-access dynamic-qos
+!
+
+----
+
+Then in the PacketFence switch configuration, enable `Role by Switch Role` and configure the role(s) to `ip-access-group-in=test;`
+
 Enterasys 
 ~~~~~~~~~
 
