@@ -954,6 +954,11 @@ sub detect_computername_change : Public {
     return 0;
 }
 
+sub process_dhcpv6 {
+    my ( $class, $packet ) = @_;
+    use Data::Dumper ; pf::log::get_logger->info(Dumper($packet));
+}
+
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>

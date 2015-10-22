@@ -134,6 +134,9 @@ sub processFingerbank :Private {
         mac                 => $mac,
         dhcp_fingerprint    => $node_attributes->{'dhcp_fingerprint'},
         dhcp_vendor         => $node_attributes->{'dhcp_vendor'},
+        dhcp6_fingerprint   => $node_attributes->{'dhcp6_fingerprint'},
+        dhcp6_enterprise    => $node_attributes->{'dhcp6_enterprise'},
+        ip                  => $portalSession->clientIp,
     );
 
     pf::fingerbank::process(\%fingerbank_query_args);
