@@ -127,15 +127,10 @@ sub processFingerbank :Private {
     my $portalSession   = $c->portalSession;
     my $mac             = $portalSession->clientMac;
     my $user_agent      = $c->request->user_agent;
-    my $node_attributes = node_attributes($mac);
 
     my %fingerbank_query_args = (
         user_agent          => $user_agent,
         mac                 => $mac,
-        dhcp_fingerprint    => $node_attributes->{'dhcp_fingerprint'},
-        dhcp_vendor         => $node_attributes->{'dhcp_vendor'},
-        dhcp6_fingerprint   => $node_attributes->{'dhcp6_fingerprint'},
-        dhcp6_enterprise    => $node_attributes->{'dhcp6_enterprise'},
         ip                  => $portalSession->clientIp,
     );
 
