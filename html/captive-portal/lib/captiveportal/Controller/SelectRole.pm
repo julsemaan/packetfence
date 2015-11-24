@@ -1,30 +1,26 @@
-package captiveportal::Controller::Authenticate;
+package captiveportal::Controller::SelectRole;
 use Moose;
 
-BEGIN { extends 'captiveportal::PacketFence::Controller::Authenticate'; }
+use pf::nodecategory;
+use pf::node;
 
-sub login : Local : Args(0) {
-    my ( $self, $c ) = @_;
+BEGIN { extends 'captiveportal::Base::Controller'; }
+
+__PACKAGE__->config( namespace => 'select_role', );
+
+sub index : Path : Args(0) {
+    my ($self, $c) = @_;
     if ( $c->request->method eq 'POST' ) {
-
-        # External authentication
-        $c->forward('validateLogin');
-        $c->forward('enforceLoginRetryLimit');
-        $c->forward('authenticationLogin');
-        $c->detach('showLogin') if $c->has_errors;
-        $c->forward('validateMandatoryFields');
-        $c->forward('postAuthentication');
-        $c->forward( 'CaptivePortal' => 'webNodeRegister', [$c->stash->{info}->{pid}, %{$c->stash->{info}}] );
-        # We push the select role page to super admins
-        if($c->stash->{info}->{category} eq "ITAdmins"){
-            $c->response->redirect('/select_role');
-        }
+        my $mac = $c->portalSession->clientMac;
+        my $role = $c->request->param('role');
+        $c->log->info("Assigning role $role to $mac");
+        node_modify($mac, category => $role);
         $c->forward( 'CaptivePortal' => 'endPortalSession' );
     }
-
-    # Return login
-    $c->forward('showLogin');
-
+    else {
+        $c->stash->{roles} = [nodecategory_view_all()];
+        $c->stash->{template} = "select_role.html";
+    }
 }
 
 =head1 NAME

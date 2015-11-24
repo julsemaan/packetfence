@@ -1,0 +1,18 @@
+
+[% INCLUDE header.html %]
+
+
+<form name="select_role" method="POST">
+  <div>
+    <label>Select a role for this device : </label>
+    <select name="role">
+      [% FOREACH role IN roles %]
+      <option>[% role.name %]</option>
+      [% END %]
+    </select>
+  </div>
+  <div>
+    <input type="submit">
+  </div>
+</form>
+[% INCLUDE footer.html %]
