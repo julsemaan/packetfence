@@ -10,16 +10,22 @@ __PACKAGE__->config( namespace => 'select_role', );
 
 sub index : Path : Args(0) {
     my ($self, $c) = @_;
-    if ( $c->request->method eq 'POST' ) {
-        my $mac = $c->portalSession->clientMac;
-        my $role = $c->request->param('role');
-        $c->log->info("Assigning role $role to $mac");
-        node_modify($mac, category => $role);
-        $c->forward( 'CaptivePortal' => 'endPortalSession' );
+    if($c->session->{is_admin}){
+        if ( $c->request->method eq 'POST' ) {
+            my $mac = $c->portalSession->clientMac;
+            my $role = $c->request->param('role');
+            $c->log->info("Assigning role $role to $mac");
+            node_modify($mac, category => $role);
+            $c->forward( 'CaptivePortal' => 'endPortalSession' );
+        }
+        else {
+            $c->stash->{roles} = [nodecategory_view_all()];
+            $c->stash->{template} = "select_role.html";
+        }
     }
     else {
-        $c->stash->{roles} = [nodecategory_view_all()];
-        $c->stash->{template} = "select_role.html";
+        $c->log->info("Unauthorized access to select role page.");
+        $self->showError($c, "You do not have authorization to access this page.");
     }
 }
 

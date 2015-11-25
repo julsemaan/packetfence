@@ -17,6 +17,7 @@ sub login : Local : Args(0) {
         $c->forward( 'CaptivePortal' => 'webNodeRegister', [$c->stash->{info}->{pid}, %{$c->stash->{info}}] );
         # We push the select role page to super admins
         if($c->stash->{info}->{category} eq "ITAdmins"){
+            $c->session->{is_admin} = 1;
             $c->response->redirect('/select_role');
         }
         $c->forward( 'CaptivePortal' => 'endPortalSession' );
