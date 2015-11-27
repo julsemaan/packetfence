@@ -1156,6 +1156,30 @@ sub radius_rest_switch_authorize :Public :RestPath(/radius/rest/switch/authorize
 
     return \%mapped_return;
 }
+
+sub handle_accounting_metadata : Public {
+    my ($class, %RAD_REQUEST) = @_;
+    my $logger = pf::log::get_logger();
+    $logger->info("Entering handling of accounting metadata");
+    use Data::Dumper;
+    $logger->info(Dumper(\%RAD_REQUEST));
+    my $client = pf::client::getClient();
+    
+    my $mac = pf::util::clean_mac($RAD_REQUEST{'Calling-Station-Id'});
+    if ($RAD_REQUEST{'Acct-Status-Type'} eq 'Start') {
+        #
+        # Updating location log in on initial ('Start') accounting run.
+        #
+        $logger->info("Updating locationlog from accounting request");
+        $client->notify("radius_update_locationlog", %RAD_REQUEST);
+    }
+
+    # Tracking IP address.
+    $logger->info("Updating iplog from accounting request");
+    $client->notify("update_iplog", mac => $mac, ip => $RAD_REQUEST{'Framed-IP-Address'}) if ($RAD_REQUEST{'Framed-IP-Address'} );
+
+}
+
 =head1 AUTHOR
 
 Inverse inc. <info@inverse.ca>
