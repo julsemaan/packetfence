@@ -53,6 +53,7 @@ sub supportsWirelessDot1x { return $TRUE; }
 sub supportsWirelessMacAuth { return $TRUE; }
 sub supportsRoleBasedEnforcement { return $TRUE; }
 sub supportsExternalPortal { return $TRUE; }
+sub supportsAccountingFingerprinting { return $TRUE; }
 
 # disabling special features supported by generic Cisco's but not on WLCs
 sub supportsSaveConfig { return $FALSE; }
@@ -325,6 +326,20 @@ sub parseRequest {
         }
     }
     return ($nas_port_type, $eap_type, $client_mac, $port, $user_name, $nas_port_id, $session_id);
+}
+
+sub parseAccountingFingerprints {
+    my ( $self, $radius_request ) = @_;
+    use Data::Dumper;
+    foreach my $pair (@{$radius_request->{"Cisco-AVPair"}}){
+        my ($key, $value) = split('=', $pair);
+        $self->logger->info("Found pair $key - $value");
+        my @prefixes;
+        while($value =~ s/^(\\{1}[0-9]{3}[<>]{0,1})//g ){ 
+            push @prefixes, $1;
+        }
+        $self->logger->info("Cleaned value is : $value");
+    }
 }
 
 =head1 AUTHOR

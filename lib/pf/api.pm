@@ -1178,6 +1178,20 @@ sub handle_accounting_metadata : Public {
     $logger->info("Updating iplog from accounting request");
     $client->notify("update_iplog", mac => $mac, ip => $RAD_REQUEST{'Framed-IP-Address'}) if ($RAD_REQUEST{'Framed-IP-Address'} );
 
+    my ( $switch_mac, $switch_ip, $source_ip, $stripped_user_name, $realm ) = pf::radius->new->_parseRequest(\%RAD_REQUEST);
+    my $switch = pf::SwitchFactory->instantiate({ switch_mac => $switch_mac, switch_ip => $switch_ip, controllerIp => $source_ip});
+    # is switch object correct?
+    if (!$switch) {
+        $logger->warn("Can't instantiate switch ($switch_ip). Are you sure your switches.conf is correct?");
+        return;
+    }
+
+    if($switch->supportsAccountingFingerprinting()){
+        my $result = $switch->parseAccountingFingerprints(\%RAD_REQUEST);
+        if($result) {
+            pf::fingerbank->process($result);
+        }
+    }
 }
 
 =head1 AUTHOR

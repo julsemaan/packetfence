@@ -245,6 +245,14 @@ sub supportsLldp {
 
 sub supportsRadiusDynamicVlanAssignment { return $TRUE; }
 
+=item supportsAccountingFingerprinting
+
+Does the network device supports extracting fingerprinting infos from the accounting packets
+
+=cut
+
+sub supportsAccountingFingerprinting { return $FALSE; }
+
 =item inlineCapabilities
 
 =cut
@@ -3128,6 +3136,18 @@ sub returnAuthorizeRead {
         ($radius_reply_ref, $status) = $filter->handleAnswerInRule($rule,$args,$radius_reply_ref);
     }
     return [$status, %$radius_reply_ref];
+}
+
+=item parseAccountingFingerprints
+
+Parse the fingerprints from an accounting packet
+
+=cut
+
+sub parseAccountingFingerprints {
+    my ( $self, $radius_request ) = @_;
+    $self->logger->warn("Parsing fingerprinting data is not supported in this switch module");
+    return $FALSE;
 }
 
 =back
