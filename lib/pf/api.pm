@@ -65,8 +65,20 @@ use pf::dhcp::processor();
 use pf::util::dhcpv6();
 
 sub event_add : Public {
-    my ($class, %postdata) = @_;
+    my ($class, @args) = @_;
     my $logger = pf::log::get_logger();
+    my %postdata = @args;
+
+    if(!defined($postdata{'events'}) && scalar(@args) == 4) {
+        pf::log::get_logger->info("Received event formatted in an old format, parsing as (type => tid, date, srcip)");
+        $postdata{'date'} = $args[0];
+        $postdata{'srcip'} = $args[1];
+        $postdata{'events'} = {
+                $args[2] => $args[3],
+        };
+    }
+
+    pf::log::get_logger->debug(sub {use Data::Dumper ; "Received events : ".Dumper($postdata{'events'})});
 
     while( my ($type, $id) = each %{$postdata{'events'}}) {
         $logger->debug("Received event : $type, $id");
