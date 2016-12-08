@@ -47,16 +47,7 @@ sub action {
     if ($method eq 'Start') {
         my $node_info = node_view($mac);
         my $username = $node_info->{'pid'};
-
-        my @categories = @{$self->{categories}};
-        if (
-            defined($node_info) &&
-            (ref($node_info) eq 'HASH') &&
-            $node_info->{'status'} eq $pf::node::STATUS_REGISTERED &&
-            (grep $_ eq $node_info->{'category'}, @categories)
-        ){
-            $self->send_command("cts role-based sgt-map $ip sgt $node_info->{category_id}");
-        }
+        $self->send_command("cts role-based sgt-map $ip sgt $node_info->{category_id}");
     }
     elsif ($method eq 'Stop') {
         my $node_info = node_view($mac);
