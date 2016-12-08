@@ -60,7 +60,7 @@ sub send_command {
     my ($self, $command) = @_;
     my $logger = get_logger;
     # Create a request
-    my $req = HTTP::Request->new(POST => "http://".$self->{id}."/api/cli");
+    my $req = HTTP::Request->new(POST => "https://".$self->{id}."/api/cli");
     $req->content_type('application/json');
     my $payload = {
         commands => [
