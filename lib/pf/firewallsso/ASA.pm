@@ -61,6 +61,7 @@ sub send_command {
     my $logger = get_logger;
     # Create a request
     my $req = HTTP::Request->new(POST => "https://".$self->{id}."/api/cli");
+    $req->authorization_basic($ConfigFirewallSSO{$self->{id}}{username}, $ConfigFirewallSSO{$self->{id}}{password});
     $req->content_type('application/json');
     my $payload = {
         commands => [
