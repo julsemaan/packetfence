@@ -44,14 +44,17 @@ sub action {
     my ($self,$firewall_id,$method,$mac,$ip,$timeout) = @_;
     my $logger = get_logger();
 
+    my $node_info = node_view($mac);
     if ($method eq 'Start') {
-        my $node_info = node_view($mac);
         my $username = $node_info->{'pid'};
-        $self->send_command("cts role-based sgt-map $ip sgt $node_info->{category_id}");
+        if($node_info->{category_id}) {
+            $self->send_command("cts role-based sgt-map $ip sgt $node_info->{category_id}");
+        }
     }
     elsif ($method eq 'Stop') {
-        my $node_info = node_view($mac);
-        $self->send_command("no cts role-based sgt-map $ip sgt $node_info->{category_id}");
+        if($node_info->{category_id}) {
+            $self->send_command("no cts role-based sgt-map $ip sgt $node_info->{category_id}");
+        }
     }
     return 0;
 }
