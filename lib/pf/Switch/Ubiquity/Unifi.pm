@@ -7,13 +7,11 @@ pf::Switch::Ubiquity::Unifi
 =head1 SYNOPSIS
 
 The pf::Switch::Ubiquity::Unifi module implements an object oriented interface to
-manage Unifi  controllers
+manage Unifi controllers
 
 =head1 STATUS
 
 Developed and tested on Unifi controller version 5.4.14 with a UniFi AP-AC-Pro running 3.4.14.3413
-
-=head1 BUGS AND LIMITATIONS
 
 =cut
 
