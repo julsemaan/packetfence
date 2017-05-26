@@ -24,7 +24,7 @@ has 'access_token_param' => (isa => 'Str', is => 'rw', default => 'access_token'
 has 'scope' => (isa => 'Str', is => 'rw', default => 'read_user');
 has 'protected_resource_url' => (isa => 'Str', is => 'rw', default => 'https://www.cobot.me/api/user');
 has 'redirect_url' => (isa => 'Str', is => 'rw', required => 1, default => 'https://<hostname>/oauth2/callback');
-has 'domains' => (isa => 'Str', is => 'rw', required => 1, default => '*.cobot.me');
+has 'domains' => (isa => 'Str', is => 'rw', required => 1, default => '*.cobot.me,*.cloudfront.net');
 
 =head2 dynamic_routing_module
 
