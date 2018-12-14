@@ -538,6 +538,12 @@ export const pfConfigurationListColumns = {
     sortable: true,
     visible: true
   },
+  desc: {
+    key: 'desc',
+    label: i18n.t('Description'),
+    sortable: true,
+    visible: true
+  },
   description: {
     key: 'description',
     label: i18n.t('Description'),
@@ -667,6 +673,11 @@ export const pfConfigurationRolesListColumns = [
   pfConfigurationListColumns.buttons
 ]
 
+export const pfConfigurationSecurityEventsListColumns = [
+  Object.assign(pfConfigurationListColumns.id, { label: i18n.t('Identifier') }), // re-label
+  pfConfigurationListColumns.desc
+]
+
 export const pfConfigurationBillingTiersListColumns = [
   Object.assign(pfConfigurationListColumns.id, { label: i18n.t('Identifier') }), // re-label
   pfConfigurationListColumns.name,
@@ -682,6 +693,11 @@ export const pfConfigurationListFields = {
   class: {
     value: 'class',
     text: i18n.t('Class'),
+    types: [conditionType.SUBSTRING]
+  },
+  desc: {
+    value: 'desc',
+    text: i18n.t('Description'),
     types: [conditionType.SUBSTRING]
   },
   description: {
@@ -742,6 +758,11 @@ export const pfConfigurationRolesListFields = [
   pfConfigurationListFields.notes
 ]
 
+export const pfConfigurationSecurityEventsListFields = [
+  Object.assign(pfConfigurationListFields.id, { text: i18n.t('Identifer') }), // re-text
+  pfConfigurationListFields.desc
+]
+
 export const pfConfigurationViewFields = {
   id: ({ isNew = false, isClone = false } = {}) => {
     return {
@@ -761,6 +782,18 @@ export const pfConfigurationViewFields = {
         }
       ]
     }
+  },
+  desc: {
+    label: i18n.t('Description'),
+    fields: [
+      {
+        key: 'desc',
+        component: pfFormInput,
+        validators: {
+          [i18n.t('Description required.')]: required
+        }
+      }
+    ]
   },
   description: {
     label: i18n.t('Description'),
@@ -3596,6 +3629,12 @@ export const pfConfigurationRealmViewDefaults = (context = {}) => {
 }
 
 export const pfConfigurationRoleViewDefaults = (context = {}) => {
+  return {
+    id: null
+  }
+}
+
+export const pfConfigurationSecurityEventsViewDefaults = (context = {}) => {
   return {
     id: null
   }

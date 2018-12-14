@@ -159,5 +159,36 @@ export default {
     return apiCall.get(`config/portal_module/${id}`).then(response => {
       return response.data.item
     })
-  }
+  },
+  /**
+   * Security Events
+   */
+  securityEvents: params => {
+    //TODO: change to config/security_events once API is renamed
+    return apiCall.get('config/violations', { params }).then(response => {
+      return response.data
+    })
+  },
+  securityEvent: id => {
+    //TODO: change to config/security_events once API is renamed
+    return apiCall.get(`config/violation/${id}`).then(response => {
+      return response.data.item
+    })
+  },
+  createSecurityEvent: data => {
+    //TODO: change to config/security_events once API is renamed
+    return apiCall.post('config/violations', data).then(response => {
+      return response.data
+    })
+  },
+  updateSecurityEvent: data => {
+    //TODO: change to config/security_events once API is renamed
+    return apiCall.patch(`config/violation/${data.id}`, data).then(response => {
+      return response.data
+    })
+  },
+  deleteSecurityEvent: id => {
+    //TODO: change to config/security_events once API is renamed
+    return apiCall.delete(`config/violation/${id}`)
+  },
 }

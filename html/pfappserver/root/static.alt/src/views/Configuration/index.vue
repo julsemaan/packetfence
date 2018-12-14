@@ -36,6 +36,14 @@ export default {
           ]
         },
         {
+          name: 'Compliance',
+          icon: 'shield',
+          collapsable: true,
+          items: [
+            { name: 'Security Events', path: '/configuration/security_events' }
+          ]
+        },
+        {
           name: 'Advanced Access Configuration',
           icon: 'list-alt',
           collapsable: true,

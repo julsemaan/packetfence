@@ -7,6 +7,7 @@ import FloatingDevicesStore from '../_store/floatingDevices'
 import PortalModulesStore from '../_store/portalModules'
 import RealmsStore from '../_store/realms'
 import RolesStore from '../_store/roles'
+import SecurityEventsStore from '../_store/securityEvents'
 
 const PoliciesAccessControlSection = () => import(/* webpackChunkName: "Configuration" */ '../_components/PoliciesAccessControlSection')
 const RolesList = () => import(/* webpackChunkName: "Configuration" */ '../_components/RolesList')
@@ -25,6 +26,9 @@ const PortalModuleView = () => import(/* webpackChunkName: "Configuration" */ '.
 
 const BillingTiersList = () => import(/* webpackChunkName: "Configuration" */ '../_components/BillingTiersList')
 const BillingTierView = () => import(/* webpackChunkName: "Configuration" */ '../_components/BillingTierView')
+
+const SecurityEventsList = () => import(/* webpackChunkName: "Configuration" */ '../_components/SecurityEventsList')
+//const SecurityEventView = () => import(/* webpackChunkName: "Configuration" */ '../_components/SecurityEventView')
 
 const route = {
   path: '/configuration',
@@ -264,7 +268,30 @@ const route = {
           next()
         })
       }
-    }
+    },
+    {
+      path: 'security_events',
+      name: 'security_events',
+      component: SecurityEventsList,
+      props: (route) => ({ query: route.query.query })
+    },
+    //{
+    //  path: 'security_events/new',
+    //  name: 'newSecurityEvent',
+    //  component: SecurityEventView,
+    //  props: (route) => ({ storeName: '$_security_events', isNew: true })
+    //},
+    //{
+    //  path: 'security_event/:id',
+    //  name: 'security_event',
+    //  component: SecurityEventView,
+    //  props: (route) => ({ storeName: '$_security_events', id: route.params.id }),
+    //  beforeEnter: (to, from, next) => {
+    //    store.dispatch('$_security_events/getSecurityEvent', to.params.id).then(object => {
+    //      next()
+    //    })
+    //  }
+    //}
   ]
 }
 
