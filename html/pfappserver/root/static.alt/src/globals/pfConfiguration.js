@@ -3368,6 +3368,74 @@ export const pfConfigurationRoleViewFields = (context = {}) => {
   ]
 }
 
+export const pfConfigurationSecurityEventViewFields = (context = {}) => {
+  const { isNew = false, isClone = false } = context
+  return [
+    {
+      label: i18n.t('Identifier'),
+      fields: [
+        {
+          key: 'id',
+          component: pfFormInput,
+          attrs: {
+            disabled: (!isNew && !isClone)
+          },
+          validators: {
+            [i18n.t('Name required.')]: required,
+            [i18n.t('Numeric value required.')]: numeric
+          }
+        }
+      ]
+    },
+    {
+      label: i18n.t('Description'),
+      fields: [
+        {
+          key: 'desc',
+          component: pfFormInput,
+          validators: {
+            [i18n.t('Description required.')]: required
+          }
+        }
+      ]
+    },
+    {
+      label: i18n.t('Priority'),
+      fields: [
+        {
+          key: 'priority',
+          component: pfFormInput,
+          validators: {
+            [i18n.t('Priority required')]: required,
+            [i18n.t('Value must be numeric.')]: numeric,
+            [i18n.t('Value must be at least 1')]: minValue(1),
+            [i18n.t('Value must be maximum 10')]: maxValue(10)
+          }
+        }
+      ]
+    },
+    {
+      label: i18n.t('Ignored Roles'),
+      fields: [
+        {
+          key: 'whitelisted_roles',
+          component: pfFormChosen,
+          attrs: {
+            collapseObject: true,
+            placeholder: i18n.t('Click to select a role'),
+            trackBy: 'value',
+            label: 'text',
+            multiple: true,
+            clearOnSelect: false,
+            closeOnSelect: false,
+            options: context.roles.map(role => { return { value: role.name, text: role.name } })
+          }
+        }
+      ]
+    },
+  ]
+}
+
 export const pfConfigurationAuthenticationSourcesViewDefaults = (context = {}) => {
   const { sourceType = null } = context
   switch (sourceType) {
@@ -3634,9 +3702,10 @@ export const pfConfigurationRoleViewDefaults = (context = {}) => {
   }
 }
 
-export const pfConfigurationSecurityEventsViewDefaults = (context = {}) => {
+export const pfConfigurationSecurityEventViewDefaults = (context = {}) => {
   return {
-    id: null
+    id: null,
+    priority: 4,
   }
 }
 
