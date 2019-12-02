@@ -138,7 +138,7 @@ export const pfConfigurationFirewallViewFields = (context) => {
           ]
         },
         {
-          if: ['BarracudaNG', 'JSONRPC', 'JuniperSRX'].includes(firewallType),
+          if: ['BarracudaNG', 'JSONRPC', 'JuniperSRX', 'CiscoIsePic'].includes(firewallType),
           label: i18n.t('Username'),
           fields: [
             {
@@ -150,7 +150,7 @@ export const pfConfigurationFirewallViewFields = (context) => {
           ]
         },
         {
-          if: ['BarracudaNG', 'Checkpoint', 'FortiGate', 'Iboss', 'JuniperSRX', 'WatchGuard'].includes(firewallType),
+          if: ['BarracudaNG', 'Checkpoint', 'FortiGate', 'Iboss', 'JuniperSRX', 'WatchGuard', 'CiscoIsePic'].includes(firewallType),
           label: i18n.t('Secret or Key'),
           fields: [
             {
@@ -174,7 +174,7 @@ export const pfConfigurationFirewallViewFields = (context) => {
           ]
         },
         {
-          if: ['BarracudaNG', 'Checkpoint', 'FortiGate', 'Iboss', 'JuniperSRX', 'WatchGuard', 'JSONRPC'].includes(firewallType),
+          if: ['BarracudaNG', 'Checkpoint', 'FortiGate', 'Iboss', 'JuniperSRX', 'WatchGuard', 'JSONRPC', 'CiscoIsePic'].includes(firewallType),
           label: i18n.t('Port of the service'),
           text: i18n.t('If you use an alternative port, please specify.'),
           fields: [

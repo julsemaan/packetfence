@@ -42,6 +42,7 @@ our %TYPES_TO_FORMS = (
       JSONRPC
       PaloAlto
       JuniperSRX
+      CiscoIsePic
     )
 );
 
